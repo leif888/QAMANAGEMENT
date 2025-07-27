@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Typography, Button, Table, Space, Tag, Modal, Form, Input, Select, message, Card, Tooltip } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { Typography, Button, Table, Space, Tag, Modal, Form, Input, Select, message, Card, Tooltip, Checkbox, Divider } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, InfoCircleOutlined, ExperimentOutlined } from '@ant-design/icons'
 import { testStepApi } from '@/services/api'
 import type { TestStep } from '@/types'
 
@@ -20,8 +20,12 @@ const TestSteps: React.FC = () => {
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingStep, setEditingStep] = useState<ExtendedTestStep | null>(null)
   const [form] = Form.useForm()
+  const [generateForm] = Form.useForm()
   const [dataSource, setDataSource] = useState<ExtendedTestStep[]>([])
   const [loading, setLoading] = useState(false)
+  const [selectedSteps, setSelectedSteps] = useState<number[]>([])
+  const [isGenerateModalVisible, setIsGenerateModalVisible] = useState(false)
+  const [generatedContent, setGeneratedContent] = useState<{feature: string, stepDefs: string} | null>(null)
 
   useEffect(() => {
     loadTestSteps()
@@ -215,11 +219,6 @@ const TestSteps: React.FC = () => {
   }
 
   const handleCopy = async (record: ExtendedTestStep) => {
-    if (!selectedProject) {
-      message.error('Please select a project first')
-      return
-    }
-
     try {
       const copyData = {
         name: `${record.name} (Copy)`,
@@ -228,7 +227,6 @@ const TestSteps: React.FC = () => {
         decorator: record.decorator,
         usage_example: record.usage_example,
         function_name: record.function_name,
-        project_id: selectedProject,
         parameters: record.parameters || [],
       }
 
@@ -238,6 +236,75 @@ const TestSteps: React.FC = () => {
     } catch (error) {
       console.error('Failed to copy test step:', error)
       message.error('Failed to copy test step')
+    }
+  }
+
+  const handleGenerateTestCase = async () => {
+    try {
+      const values = await generateForm.validateFields()
+
+      if (selectedSteps.length === 0) {
+        message.error('Please select at least one test step')
+        return
+      }
+
+      setLoading(true)
+
+      const requestData = {
+        step_ids: selectedSteps,
+        test_case_name: values.test_case_name,
+        test_case_description: values.test_case_description || '',
+        tags: values.tags || '',
+        project_id: 1
+      }
+
+      const response = await fetch('http://localhost:8000/api/v1/test-steps/generate-test-case', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData)
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        message.success('Test case generated successfully!')
+
+        // 显示生成的内容
+        setGeneratedContent({
+          feature: result.data.feature_content,
+          stepDefs: result.data.step_definitions_content
+        })
+
+        // 重置表单和选择
+        generateForm.resetFields()
+        setSelectedSteps([])
+        setIsGenerateModalVisible(false)
+
+        // 显示生成结果
+        Modal.info({
+          title: 'Test Case Generated Successfully',
+          content: (
+            <div>
+              <p>Test case "{result.data.test_case_name}" has been created with:</p>
+              <ul>
+                <li>Feature file: {result.data.steps_count} steps</li>
+                <li>Step definitions file</li>
+                <li>Test case ID: {result.data.test_case_id}</li>
+              </ul>
+              <p>You can now find it in the Test Cases menu and execute it via Test Executions.</p>
+            </div>
+          ),
+          width: 500
+        })
+
+      } else {
+        const error = await response.json()
+        message.error(error.detail || 'Failed to generate test case')
+      }
+    } catch (error) {
+      console.error('Failed to generate test case:', error)
+      message.error('Failed to generate test case')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -272,13 +339,23 @@ const TestSteps: React.FC = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <Title level={2}>Test Step Management</Title>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => setIsModalVisible(true)}
-        >
-          New Step
-        </Button>
+        <Space>
+          <Button
+            type="default"
+            icon={<ExperimentOutlined />}
+            onClick={() => setIsGenerateModalVisible(true)}
+            disabled={selectedSteps.length === 0}
+          >
+            Generate Test Case ({selectedSteps.length} selected)
+          </Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setIsModalVisible(true)}
+          >
+            New Step
+          </Button>
+        </Space>
       </div>
 
       <Table
@@ -286,6 +363,13 @@ const TestSteps: React.FC = () => {
         dataSource={dataSource}
         loading={loading}
         rowKey="id"
+        rowSelection={{
+          selectedRowKeys: selectedSteps,
+          onChange: (selectedRowKeys) => setSelectedSteps(selectedRowKeys as number[]),
+          getCheckboxProps: (record) => ({
+            name: record.name,
+          }),
+        }}
         pagination={{
           total: dataSource.length,
           pageSize: 10,
@@ -388,6 +472,76 @@ const TestSteps: React.FC = () => {
           >
             <Input placeholder="Enter Python function name (e.g., user_login_step)" />
           </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Generate Test Case Modal */}
+      <Modal
+        title="Generate Test Case from Selected Steps"
+        open={isGenerateModalVisible}
+        onOk={handleGenerateTestCase}
+        onCancel={() => {
+          setIsGenerateModalVisible(false)
+          generateForm.resetFields()
+        }}
+        okText="Generate Test Case"
+        cancelText="Cancel"
+        width={600}
+        confirmLoading={loading}
+      >
+        <Form
+          form={generateForm}
+          layout="vertical"
+        >
+          <div style={{ marginBottom: 16, padding: 12, background: '#f0f8ff', borderRadius: 6 }}>
+            <strong>Selected Steps ({selectedSteps.length}):</strong>
+            <div style={{ marginTop: 8 }}>
+              {selectedSteps.map(stepId => {
+                const step = dataSource.find(s => s.id === stepId)
+                return step ? (
+                  <Tag key={stepId} style={{ margin: '2px' }}>
+                    {step.name} ({step.type})
+                  </Tag>
+                ) : null
+              })}
+            </div>
+          </div>
+
+          <Form.Item
+            label="Test Case Name"
+            name="test_case_name"
+            rules={[
+              { required: true, message: 'Please enter test case name' },
+              { min: 2, message: 'Name must be at least 2 characters' },
+            ]}
+          >
+            <Input placeholder="Enter test case name" />
+          </Form.Item>
+
+          <Form.Item
+            label="Test Case Description"
+            name="test_case_description"
+          >
+            <TextArea rows={3} placeholder="Enter test case description (optional)" />
+          </Form.Item>
+
+          <Form.Item
+            label="Tags"
+            name="tags"
+            help="Enter tags separated by commas (e.g., smoke, regression, api)"
+          >
+            <Input placeholder="Enter tags (comma separated)" />
+          </Form.Item>
+
+          <div style={{ marginTop: 16, padding: 12, background: '#f6ffed', borderRadius: 6 }}>
+            <strong>What will be generated:</strong>
+            <ul style={{ marginTop: 8, marginBottom: 0 }}>
+              <li>A new Test Case in the Test Cases menu</li>
+              <li>Feature file with Gherkin scenarios</li>
+              <li>Python step definitions for Playwright</li>
+              <li>Ready to execute via Test Executions</li>
+            </ul>
+          </div>
         </Form>
       </Modal>
     </div>

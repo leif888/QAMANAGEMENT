@@ -7,6 +7,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from app.core.database import get_db
 from app.models.test_step import TestStep, StepType
+from app.services.test_case_generator import TestCaseGenerator
 
 router = APIRouter()
 
@@ -213,3 +214,52 @@ async def delete_test_step(step_id: int, db: Session = Depends(get_db)):
     db.delete(db_step)
     db.commit()
     return {"message": "Test step deleted successfully"}
+
+
+class TestCaseGenerateRequest(BaseModel):
+    step_ids: List[int]
+    test_case_name: str
+    test_case_description: str = ""
+    tags: str = ""
+    project_id: int = 1
+
+
+@router.post("/generate-test-case")
+async def generate_test_case_from_steps(
+    request: TestCaseGenerateRequest,
+    db: Session = Depends(get_db)
+):
+    """从选定的Test Steps生成Playwright+pytest-bdd测试用例"""
+    try:
+        generator = TestCaseGenerator(db)
+
+        result = generator.generate_test_case_from_steps(
+            step_ids=request.step_ids,
+            test_case_name=request.test_case_name,
+            test_case_description=request.test_case_description,
+            tags=request.tags,
+            project_id=request.project_id
+        )
+
+        return {
+            "success": True,
+            "message": "Test case generated successfully",
+            "data": result
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate test case: {str(e)}")
+
+
+@router.get("/available-for-generation")
+async def get_available_steps_for_generation(db: Session = Depends(get_db)):
+    """获取可用于生成测试用例的步骤"""
+    generator = TestCaseGenerator(db)
+    steps = generator.get_available_steps()
+
+    return {
+        "steps": steps,
+        "total_count": len(steps)
+    }

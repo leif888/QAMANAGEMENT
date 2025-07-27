@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.models.test_execution import TestExecution
 from app.models.test_case import TestCase
 from app.services.execution_engine import ExecutionEngineService
+from app.services.test_executor import PlaywrightTestExecutor
 
 router = APIRouter()
 
@@ -17,12 +18,14 @@ class TestExecutionCreate(BaseModel):
     name: str
     description: str = ""
     test_case_ids: List[int] = []  # Support multi-select test cases
+    tags: List[str] = []  # Support tag-based execution
     environment: str = "test"
     browser: str = "chromium"
     headless: bool = True
     executor: str = "system"
     status: str = "pending"
     notes: str = ""
+    execution_type: str = "playwright"  # playwright, manual, api
 
 class TestExecutionResponse(BaseModel):
     id: int
@@ -88,50 +91,56 @@ async def create_test_execution(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    """创建测试执行记录（支持多选测试用例）"""
-    # 验证测试用例存在性
-    test_cases = db.query(TestCase).filter(TestCase.id.in_(execution.test_case_ids)).all()
-    if len(test_cases) != len(execution.test_case_ids):
-        raise HTTPException(status_code=404, detail="Some test cases not found")
+    """创建测试执行记录（支持多选测试用例和标签）"""
+    # 根据test_case_ids或tags获取要执行的测试用例
+    test_cases = []
 
-    # 验证所有测试用例属于同一项目
-    project_ids = set(case.project_id for case in test_cases)
-    if len(project_ids) > 1:
-        raise HTTPException(status_code=400, detail="All test cases must belong to the same project")
+    if execution.test_case_ids:
+        # 通过ID获取测试用例
+        test_cases = db.query(TestCase).filter(TestCase.id.in_(execution.test_case_ids)).all()
+        if len(test_cases) != len(execution.test_case_ids):
+            raise HTTPException(status_code=404, detail="Some test cases not found")
+    elif execution.tags:
+        # 通过标签获取测试用例
+        from sqlalchemy import or_
+        tag_conditions = []
+        for tag in execution.tags:
+            tag_conditions.append(TestCase.tags.like(f"%{tag}%"))
+        test_cases = db.query(TestCase).filter(
+            TestCase.is_active == True,
+            or_(*tag_conditions)
+        ).all()
+    else:
+        raise HTTPException(status_code=400, detail="Either test_case_ids or tags must be provided")
 
-    if project_ids and list(project_ids)[0] != execution.project_id:
-        raise HTTPException(status_code=400, detail="Test cases project mismatch")
-
-    # 创建执行记录（目前先创建单个，后续可扩展为批量）
-    service = ExecutionEngineService(db)
-
-    # 为每个测试用例创建执行记录
-    execution_results = []
-    for test_case in test_cases:
-        config = {
-            "name": f"{execution.name} - {test_case.name}",
-            "project_id": execution.project_id,
+    # 创建单个执行记录，包含所有选中的测试用例
+    db_execution = TestExecution(
+        name=execution.name,
+        description=execution.description,
+        status="pending",
+        executor_id=1,  # 默认执行者ID
+        execution_config={
+            "test_case_ids": [tc.id for tc in test_cases],
+            "tags": execution.tags,
             "environment": execution.environment,
             "browser": execution.browser,
             "headless": execution.headless,
-            "executor": execution.executor
-        }
+            "execution_type": execution.execution_type,
+            "notes": execution.notes
+        },
+        total_cases=len(test_cases)
+    )
 
-        db_execution = await service.create_execution(test_case.id, config)
-        execution_results.append(db_execution)
+    db.add(db_execution)
+    db.commit()
+    db.refresh(db_execution)
 
-        # 启动异步执行
-        background_tasks.add_task(service.start_execution, db_execution.id)
+    # 如果是Playwright执行类型，可以选择立即启动或手动启动
+    if execution.execution_type == "playwright":
+        # 这里可以选择立即启动或等待手动触发
+        pass
 
-    # 返回第一个执行记录（简化处理）
-    if execution_results:
-        first_execution = execution_results[0]
-        response = TestExecutionResponse.from_orm(first_execution)
-        response.test_case_ids = execution.test_case_ids
-        response.test_case_names = [case.name for case in test_cases]
-        return response
-
-    raise HTTPException(status_code=500, detail="Failed to create execution")
+    return TestExecutionResponse.from_orm(db_execution)
 
 @router.get("/{execution_id}", response_model=TestExecutionResponse)
 async def get_test_execution(execution_id: int, db: Session = Depends(get_db)):
@@ -230,3 +239,87 @@ async def get_test_reports_summary(
             for e in sorted(executions, key=lambda x: x.created_at, reverse=True)[:10]
         ]
     }
+
+
+@router.post("/{execution_id}/start-playwright")
+async def start_playwright_execution(
+    execution_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """启动Playwright测试执行"""
+    execution = db.query(TestExecution).filter(TestExecution.id == execution_id).first()
+    if not execution:
+        raise HTTPException(status_code=404, detail="Test execution not found")
+
+    if execution.status != "pending":
+        raise HTTPException(status_code=400, detail="Execution is not in pending status")
+
+    # 在后台启动测试执行
+    background_tasks.add_task(run_playwright_execution, execution_id, db)
+
+    return {"message": "Playwright execution started", "execution_id": execution_id}
+
+
+@router.get("/{execution_id}/progress")
+async def get_execution_progress(execution_id: int, db: Session = Depends(get_db)):
+    """获取执行进度"""
+    executor = PlaywrightTestExecutor(db)
+    progress = await executor.get_execution_progress(execution_id)
+    return progress
+
+
+@router.get("/{execution_id}/report")
+async def get_execution_report(execution_id: int, db: Session = Depends(get_db)):
+    """获取执行报告"""
+    execution = db.query(TestExecution).filter(TestExecution.id == execution_id).first()
+    if not execution:
+        raise HTTPException(status_code=404, detail="Test execution not found")
+
+    # 从execution_config中获取测试结果
+    test_results = execution.execution_config.get("test_results", {})
+
+    return {
+        "execution_id": execution_id,
+        "name": execution.name,
+        "status": execution.status,
+        "summary": {
+            "total_cases": execution.total_cases,
+            "passed_cases": execution.passed_cases,
+            "failed_cases": execution.failed_cases,
+            "skipped_cases": execution.skipped_cases,
+            "pass_rate": execution.pass_rate,
+            "duration": execution.duration
+        },
+        "started_at": execution.started_at.isoformat() if execution.started_at else None,
+        "completed_at": execution.completed_at.isoformat() if execution.completed_at else None,
+        "test_results": test_results
+    }
+
+
+async def run_playwright_execution(execution_id: int, db: Session):
+    """后台运行Playwright测试执行"""
+    try:
+        executor = PlaywrightTestExecutor(db)
+        execution = db.query(TestExecution).filter(TestExecution.id == execution_id).first()
+
+        # 获取执行配置
+        test_case_ids = execution.execution_config.get("test_case_ids", [])
+        tags = execution.execution_config.get("tags", [])
+
+        # 执行测试
+        result = await executor.execute_test_cases(
+            execution_id=execution_id,
+            test_case_ids=test_case_ids if test_case_ids else None,
+            tags=tags if tags else None
+        )
+
+        print(f"Execution {execution_id} completed: {result}")
+
+    except Exception as e:
+        print(f"Execution {execution_id} failed: {str(e)}")
+        # 更新执行状态为失败
+        execution = db.query(TestExecution).filter(TestExecution.id == execution_id).first()
+        if execution:
+            execution.status = "failed"
+            db.commit()
