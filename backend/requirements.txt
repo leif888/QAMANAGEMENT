@@ -1,0 +1,15 @@
+# Core dependencies
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+pydantic-settings
+
+# Test execution dependencies
+pytest==7.4.3
+pytest-bdd==7.0.0
+playwright==1.40.0
+pytest-html==3.2.0
+pytest-json-report==1.5.0
+python-dotenv==1.0.0
+requests==2.31.0

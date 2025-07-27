@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Project Selection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .project-item {
+            border: 1px solid #ddd;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .project-name {
+            font-weight: bold;
+            font-size: 18px;
+            color: #333;
+        }
+        .project-description {
+            color: #666;
+            margin-top: 5px;
+        }
+        .project-id {
+            color: #999;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+        }
+        .error {
+            color: red;
+            background: #ffe6e6;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success {
+            color: green;
+            background: #e6ffe6;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .test-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 5px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        select {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <h1>QA管理系统 - 完整功能测试</h1>
+    
+    <div id="status" class="loading">正在加载项目列表...</div>
+    
+    <div id="projects-container"></div>
+    
+    <div class="test-section">
+        <h3>测试用例创建</h3>
+        <div>
+            <label for="project-select">选择项目:</label>
+            <select id="project-select">
+                <option value="">请选择项目...</option>
+            </select>
+        </div>
+        <div>
+            <label for="test-case-name">测试用例名称:</label>
+            <input type="text" id="test-case-name" placeholder="输入测试用例名称" style="width: 300px; padding: 8px;">
+        </div>
+        <div>
+            <button onclick="createTestCase()">创建测试用例</button>
+        </div>
+        <div id="create-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试步骤管理</h3>
+        <button onclick="loadTestSteps()">加载测试步骤</button>
+        <div id="test-steps-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试数据树形结构</h3>
+        <button onclick="loadTestDataTree()">加载测试数据树</button>
+        <div id="test-data-tree-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试用例树形结构</h3>
+        <button onclick="loadTestCasesTree()">加载测试用例树</button>
+        <div id="test-cases-tree-result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1';
+        
+        async function loadProjects() {
+            try {
+                const response = await fetch(`${API_BASE}/projects`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const projects = await response.json();
+                displayProjects(projects);
+                populateProjectSelect(projects);
+                
+                document.getElementById('status').innerHTML = 
+                    `<div class="success">✅ 成功加载 ${projects.length} 个项目</div>`;
+                    
+            } catch (error) {
+                console.error('Error loading projects:', error);
+                document.getElementById('status').innerHTML = 
+                    `<div class="error">❌ 加载项目失败: ${error.message}</div>`;
+            }
+        }
+        
+        function displayProjects(projects) {
+            const container = document.getElementById('projects-container');
+            container.innerHTML = '';
+            
+            if (projects.length === 0) {
+                container.innerHTML = '<p>没有找到项目</p>';
+                return;
+            }
+            
+            projects.forEach(project => {
+                const projectDiv = document.createElement('div');
+                projectDiv.className = 'project-item';
+                projectDiv.innerHTML = `
+                    <div class="project-name">${project.name}</div>
+                    <div class="project-description">${project.description || '无描述'}</div>
+                    <div class="project-id">ID: ${project.id} | 状态: ${project.status || 'unknown'}</div>
+                `;
+                container.appendChild(projectDiv);
+            });
+        }
+        
+        function populateProjectSelect(projects) {
+            const select = document.getElementById('project-select');
+            select.innerHTML = '<option value="">请选择项目...</option>';
+            
+            projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                option.textContent = project.name;
+                select.appendChild(option);
+            });
+        }
+        
+        async function createTestCase() {
+            const projectId = document.getElementById('project-select').value;
+            const testCaseName = document.getElementById('test-case-name').value;
+            const resultDiv = document.getElementById('create-result');
+            
+            if (!projectId) {
+                resultDiv.innerHTML = '<div class="error">请选择项目</div>';
+                return;
+            }
+            
+            if (!testCaseName) {
+                resultDiv.innerHTML = '<div class="error">请输入测试用例名称</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/test-cases`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name: testCaseName,
+                        description: '通过测试页面创建的测试用例',
+                        priority: 'MEDIUM',
+                        project_id: parseInt(projectId),
+                        gherkin_content: `Feature: ${testCaseName}
+  Scenario: 测试场景
+    Given 前置条件
+    When 执行操作
+    Then 验证结果`,
+                        creator_id: 1,
+                        is_automated: true
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`HTTP ${response.status}: ${errorData.detail || response.statusText}`);
+                }
+                
+                const testCase = await response.json();
+                resultDiv.innerHTML = `<div class="success">✅ 测试用例创建成功！ID: ${testCase.id}</div>`;
+                
+                // 清空输入
+                document.getElementById('test-case-name').value = '';
+                
+            } catch (error) {
+                console.error('Error creating test case:', error);
+                resultDiv.innerHTML = `<div class="error">❌ 创建测试用例失败: ${error.message}</div>`;
+            }
+        }
+        
+        // 新增功能测试函数
+        async function loadTestSteps() {
+            try {
+                const response = await fetch(`${API_BASE}/test-steps?project_id=4`);
+                const steps = await response.json();
+
+                document.getElementById('test-steps-result').innerHTML =
+                    `<div class="success">✅ 加载了 ${steps.length} 个测试步骤</div>
+                     <pre>${JSON.stringify(steps, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('test-steps-result').innerHTML =
+                    `<div class="error">❌ 加载测试步骤失败: ${error.message}</div>`;
+            }
+        }
+
+        async function loadTestDataTree() {
+            try {
+                const response = await fetch(`${API_BASE}/test-data/tree?project_id=4`);
+                const tree = await response.json();
+
+                document.getElementById('test-data-tree-result').innerHTML =
+                    `<div class="success">✅ 加载了测试数据树</div>
+                     <pre>${JSON.stringify(tree, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('test-data-tree-result').innerHTML =
+                    `<div class="error">❌ 加载测试数据树失败: ${error.message}</div>`;
+            }
+        }
+
+        async function loadTestCasesTree() {
+            try {
+                const response = await fetch(`${API_BASE}/test-cases/tree?project_id=4`);
+                const tree = await response.json();
+
+                document.getElementById('test-cases-tree-result').innerHTML =
+                    `<div class="success">✅ 加载了测试用例树</div>
+                     <pre>${JSON.stringify(tree, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('test-cases-tree-result').innerHTML =
+                    `<div class="error">❌ 加载测试用例树失败: ${error.message}</div>`;
+            }
+        }
+
+        // 页面加载时自动加载项目
+        window.addEventListener('load', loadProjects);
+    </script>
+</body>
+</html>
