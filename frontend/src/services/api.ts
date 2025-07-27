@@ -9,16 +9,16 @@ import type {
   TestExecution 
 } from '@/types'
 
-// 创建axios实例
+// Create axios instance
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: 'http://localhost:8000/api/v1',
   timeout: 10000,
 })
 
-// 请求拦截器
+// Request interceptor
 api.interceptors.request.use(
   (config) => {
-    // 可以在这里添加认证token
+    // Add authentication token here if needed
     return config
   },
   (error) => {
@@ -26,7 +26,7 @@ api.interceptors.request.use(
   }
 )
 
-// 响应拦截器
+// Response interceptor
 api.interceptors.response.use(
   (response) => {
     return response.data
@@ -37,7 +37,7 @@ api.interceptors.response.use(
   }
 )
 
-// 项目相关API
+// Project related API
 export const projectApi = {
   getProjects: (): Promise<ApiResponse<PaginatedResponse<Project>>> =>
     api.get('/projects'),

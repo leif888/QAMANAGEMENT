@@ -56,14 +56,15 @@ class TestCase(BaseModel):
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, comment="所属项目ID")
     creator_id = Column(Integer, nullable=False, comment="创建者ID")  # 暂时用整数，后续可关联用户表
 
-    # 关联关系
+    # Relationships
     project = relationship("Project", back_populates="test_cases")
     test_case_steps = relationship("TestCaseStep", back_populates="test_case", cascade="all, delete-orphan")
     executions = relationship("TestExecution", back_populates="test_case")
     reviews = relationship("TestCaseReview", back_populates="test_case", cascade="all, delete-orphan")
     history = relationship("TestCaseHistory", back_populates="test_case", cascade="all, delete-orphan")
+    files = relationship("TestCaseFile", back_populates="test_case", cascade="all, delete-orphan")
 
-    # 树形结构关系
+    # Tree structure relationships
     parent = relationship("TestCase", remote_side="TestCase.id", back_populates="children")
     children = relationship("TestCase", back_populates="parent", cascade="all, delete-orphan")
 

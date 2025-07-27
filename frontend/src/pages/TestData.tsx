@@ -1,6 +1,8 @@
-import React, { useState } from 'react'
-import { Typography, Button, Table, Space, Tag, Modal, Form, Input, Select, message, Drawer } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Typography, Button, Table, Space, Tag, Modal, Form, Input, Select, message, Drawer, Spin } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, EyeOutlined } from '@ant-design/icons'
+import { testDataApi, projectApi } from '@/services/api'
+import type { TestData, Project } from '@/types'
 
 const { Title } = Typography
 const { TextArea } = Input
@@ -9,60 +11,53 @@ const { Option } = Select
 const TestData: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
-  const [editingDataset, setEditingDataset] = useState<any>(null)
+  const [editingDataset, setEditingDataset] = useState<TestData | null>(null)
   const [isDataViewerVisible, setIsDataViewerVisible] = useState(false)
-  const [viewingDataset, setViewingDataset] = useState<any>(null)
+  const [viewingDataset, setViewingDataset] = useState<TestData | null>(null)
   const [form] = Form.useForm()
-  const [dataSource, setDataSource] = useState([
-    {
-      key: '1',
-      name: 'User Basic Data',
-      description: 'Test data for user registration and login',
-      dataType: 'user',
-      recordCount: 100,
-      version: 'v1.2',
-      updatedAt: '2024-01-20',
-      data: [
-        { id: 1, username: 'john_doe', email: 'john@example.com', password: 'password123', role: 'user' },
-        { id: 2, username: 'jane_smith', email: 'jane@example.com', password: 'securepass', role: 'admin' },
-        { id: 3, username: 'bob_wilson', email: 'bob@example.com', password: 'mypassword', role: 'user' },
-        { id: 4, username: 'alice_brown', email: 'alice@example.com', password: 'alicepass', role: 'moderator' },
-        { id: 5, username: 'charlie_davis', email: 'charlie@example.com', password: 'charlie123', role: 'user' },
-      ]
-    },
-    {
-      key: '2',
-      name: 'Product Information Data',
-      description: 'E-commerce platform product-related test data',
-      dataType: 'product',
-      recordCount: 250,
-      version: 'v2.1',
-      updatedAt: '2024-01-18',
-      data: [
-        { id: 1, name: 'Laptop Pro', category: 'Electronics', price: 1299.99, stock: 50, brand: 'TechCorp' },
-        { id: 2, name: 'Wireless Mouse', category: 'Electronics', price: 29.99, stock: 200, brand: 'MouseTech' },
-        { id: 3, name: 'Coffee Mug', category: 'Home', price: 12.99, stock: 100, brand: 'MugCo' },
-        { id: 4, name: 'Running Shoes', category: 'Sports', price: 89.99, stock: 75, brand: 'SportsBrand' },
-        { id: 5, name: 'Smartphone', category: 'Electronics', price: 699.99, stock: 30, brand: 'PhoneCorp' },
-      ]
-    },
-    {
-      key: '3',
-      name: 'Order Test Data',
-      description: 'Order creation, payment, refund scenario data',
-      dataType: 'order',
-      recordCount: 80,
-      version: 'v1.0',
-      updatedAt: '2024-01-15',
-      data: [
-        { id: 1, orderId: 'ORD-001', customerId: 1, total: 1329.98, status: 'completed', paymentMethod: 'credit_card' },
-        { id: 2, orderId: 'ORD-002', customerId: 2, total: 42.98, status: 'pending', paymentMethod: 'paypal' },
-        { id: 3, orderId: 'ORD-003', customerId: 3, total: 789.99, status: 'shipped', paymentMethod: 'debit_card' },
-        { id: 4, orderId: 'ORD-004', customerId: 1, total: 12.99, status: 'cancelled', paymentMethod: 'credit_card' },
-        { id: 5, orderId: 'ORD-005', customerId: 4, total: 199.99, status: 'processing', paymentMethod: 'bank_transfer' },
-      ]
-    },
-  ])
+  const [dataSource, setDataSource] = useState<TestData[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProject, setSelectedProject] = useState<number | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    loadProjects()
+  }, [])
+
+  useEffect(() => {
+    if (selectedProject) {
+      loadTestData()
+    }
+  }, [selectedProject])
+
+  const loadProjects = async () => {
+    try {
+      const response = await projectApi.getProjects()
+      setProjects(response || [])
+    } catch (error) {
+      console.error('Failed to load projects:', error)
+      message.error('Failed to load projects')
+    }
+  }
+
+  const loadTestData = async () => {
+    if (!selectedProject) return
+
+    try {
+      setLoading(true)
+      const response = await testDataApi.getTestData()
+      // Filter by project if needed (API should support this)
+      setDataSource(response || [])
+    } catch (error) {
+      console.error('Failed to load test data:', error)
+      message.error('Failed to load test data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Remove all hardcoded demo data - now using real API data
+
   const columns = [
     {
       title: 'Dataset Name',
@@ -76,18 +71,18 @@ const TestData: React.FC = () => {
     },
     {
       title: 'Data Type',
-      dataIndex: 'dataType',
-      key: 'dataType',
+      dataIndex: 'data_type',
+      key: 'data_type',
       render: (type: string) => (
         <Tag color={type === 'user' ? 'blue' : type === 'product' ? 'green' : 'orange'}>
-          {type === 'user' ? 'User Data' : type === 'product' ? 'Product Data' : 'Other'}
+          {type?.charAt(0).toUpperCase() + type?.slice(1) || 'Unknown'}
         </Tag>
       ),
     },
     {
       title: 'Record Count',
-      dataIndex: 'recordCount',
-      key: 'recordCount',
+      dataIndex: 'record_count',
+      key: 'record_count',
     },
     {
       title: 'Version',
@@ -95,9 +90,10 @@ const TestData: React.FC = () => {
       key: 'version',
     },
     {
-      title: 'Last Updated',
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
+      title: 'Created At',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (date: string) => date ? new Date(date).toLocaleDateString() : '-',
     },
     {
       title: 'Actions',

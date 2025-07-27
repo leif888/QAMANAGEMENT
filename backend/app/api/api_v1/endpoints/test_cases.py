@@ -72,7 +72,27 @@ async def get_test_cases_tree(
 
     cases = query.order_by(TestCase.sort_order, TestCase.created_at).all()
 
-    # 递归加载子节点
+    # Helper function to convert case to dict
+    def case_to_dict(case):
+        return {
+            "id": case.id,
+            "name": case.name,
+            "description": case.description,
+            "priority": case.priority.value if case.priority else "medium",
+            "status": case.status.value if case.status else "draft",
+            "gherkin_content": case.gherkin_content,
+            "is_automated": case.is_automated or False,
+            "is_folder": case.is_folder or False,
+            "parent_id": case.parent_id,
+            "sort_order": case.sort_order or 0,
+            "project_id": case.project_id,
+            "creator_id": case.creator_id,
+            "full_path": case.name,  # Simplified for now
+            "created_at": case.created_at.isoformat() if case.created_at else None,
+            "updated_at": case.updated_at.isoformat() if case.updated_at else None,
+        }
+
+    # Recursively load children
     def load_children(case):
         children = db.query(TestCase).filter(
             TestCase.parent_id == case.id
@@ -80,22 +100,20 @@ async def get_test_cases_tree(
 
         result = []
         for child in children:
-            child_dict = TestCaseResponse.from_orm(child).dict()
-            child_dict['full_path'] = child.full_path
+            child_dict = case_to_dict(child)
             child_dict['children'] = load_children(child)
             result.append(child_dict)
         return result
 
     result = []
     for case in cases:
-        case_dict = TestCaseResponse.from_orm(case).dict()
-        case_dict['full_path'] = case.full_path
+        case_dict = case_to_dict(case)
         case_dict['children'] = load_children(case)
         result.append(case_dict)
 
     return result
 
-@router.get("/", response_model=List[TestCaseResponse])
+@router.get("/")
 async def get_test_cases(
     project_id: Optional[int] = Query(None, description="项目ID过滤"),
     is_folder: Optional[bool] = Query(None, description="是否为文件夹"),
@@ -111,7 +129,30 @@ async def get_test_cases(
         query = query.filter(TestCase.is_folder == is_folder)
 
     cases = query.order_by(TestCase.created_at.desc()).all()
-    return cases
+
+    # Convert to simple dict format
+    result = []
+    for case in cases:
+        case_dict = {
+            "id": case.id,
+            "name": case.name,
+            "description": case.description or "",
+            "priority": case.priority.value if case.priority else "medium",
+            "status": case.status.value if case.status else "draft",
+            "gherkin_content": case.gherkin_content or "",
+            "is_automated": bool(case.is_automated) if hasattr(case, 'is_automated') else False,
+            "is_folder": bool(case.is_folder) if hasattr(case, 'is_folder') else False,
+            "parent_id": case.parent_id if hasattr(case, 'parent_id') else None,
+            "sort_order": case.sort_order if hasattr(case, 'sort_order') else 0,
+            "project_id": case.project_id,
+            "creator_id": case.creator_id,
+            "full_path": case.name,
+            "children": [],
+            "created_at": case.created_at.isoformat() if case.created_at else None,
+            "updated_at": case.updated_at.isoformat() if case.updated_at else None,
+        }
+        result.append(case_dict)
+    return result
 
 @router.post("/", response_model=TestCaseResponse)
 async def create_test_case(case: TestCaseCreate, db: Session = Depends(get_db)):

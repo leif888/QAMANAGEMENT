@@ -48,6 +48,11 @@ const AppSidebar: React.FC = () => {
       icon: <PlayCircleOutlined />,
       label: 'Test Executions',
     },
+    {
+      key: '/trade-templates',
+      icon: <FileTextOutlined />,
+      label: 'Trade Templates',
+    },
   ]
 
   const handleMenuClick = ({ key }: { key: string }) => {

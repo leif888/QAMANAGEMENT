@@ -33,28 +33,55 @@ class ProjectResponse(BaseModel):
 
 @router.get("/", response_model=List[ProjectResponse])
 async def get_projects(db: Session = Depends(get_db)):
-    """获取项目列表"""
+    """Get project list"""
     projects = db.query(Project).all()
-    return projects
+    # Convert enum to string for response
+    result = []
+    for project in projects:
+        project_dict = {
+            "id": project.id,
+            "name": project.name,
+            "description": project.description,
+            "status": project.status.value if project.status else "unknown",
+            "created_at": project.created_at.isoformat() if project.created_at else None,
+            "updated_at": project.updated_at.isoformat() if project.updated_at else None,
+        }
+        result.append(project_dict)
+    return result
 
 @router.post("/", response_model=ProjectResponse)
 async def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
-    """创建新项目"""
-    # 检查项目名称是否已存在
+    """Create new project"""
+    # Check if project name already exists
     existing_project = db.query(Project).filter(Project.name == project.name).first()
     if existing_project:
         raise HTTPException(status_code=400, detail="Project name already exists")
 
-    # 创建新项目
+    # Create new project
+    status_enum = ProjectStatus.ACTIVE
+    if project.status == "paused":
+        status_enum = ProjectStatus.PAUSED
+    elif project.status == "completed":
+        status_enum = ProjectStatus.COMPLETED
+
     db_project = Project(
         name=project.name,
         description=project.description,
-        status=ProjectStatus.ACTIVE if project.status == "active" else ProjectStatus.PAUSED
+        status=status_enum
     )
     db.add(db_project)
     db.commit()
     db.refresh(db_project)
-    return db_project
+
+    # Return formatted response
+    return {
+        "id": db_project.id,
+        "name": db_project.name,
+        "description": db_project.description,
+        "status": db_project.status.value,
+        "created_at": db_project.created_at.isoformat() if db_project.created_at else None,
+        "updated_at": db_project.updated_at.isoformat() if db_project.updated_at else None,
+    }
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(project_id: int, db: Session = Depends(get_db)):

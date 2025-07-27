@@ -68,7 +68,32 @@ async def get_test_steps(
             raise HTTPException(status_code=400, detail="Invalid step type")
 
     steps = query.order_by(TestStep.usage_count.desc()).all()
-    return steps
+    # Convert enum to string for response
+    result = []
+    for step in steps:
+        # Handle parameters - convert string array to dict array if needed
+        parameters = step.parameters or []
+        if parameters and isinstance(parameters[0], str):
+            # Convert string array to dict array for compatibility
+            parameters = [{"name": param, "type": "string"} for param in parameters]
+
+        step_dict = {
+            "id": step.id,
+            "name": step.name,
+            "description": step.description or "",
+            "type": step.type.value if step.type else "unknown",
+            "parameters": parameters,
+            "usage_count": step.usage_count or 0,
+            "decorator": step.decorator or "",
+            "usage_example": step.usage_example or "",
+            "function_name": step.function_name or "",
+            "project_id": step.project_id,
+            "creator_id": step.creator_id or 1,
+            "created_at": step.created_at.isoformat() if step.created_at else None,
+            "updated_at": step.updated_at.isoformat() if step.updated_at else None,
+        }
+        result.append(step_dict)
+    return result
 
 @router.post("/", response_model=TestStepResponse)
 async def create_test_step(step: TestStepCreate, db: Session = Depends(get_db)):
@@ -102,7 +127,23 @@ async def create_test_step(step: TestStepCreate, db: Session = Depends(get_db)):
     db.add(db_step)
     db.commit()
     db.refresh(db_step)
-    return db_step
+
+    # Return formatted response
+    return {
+        "id": db_step.id,
+        "name": db_step.name,
+        "description": db_step.description or "",
+        "type": db_step.type.value,
+        "parameters": db_step.parameters or [],
+        "usage_count": db_step.usage_count or 0,
+        "decorator": db_step.decorator or "",
+        "usage_example": db_step.usage_example or "",
+        "function_name": db_step.function_name or "",
+        "project_id": db_step.project_id,
+        "creator_id": db_step.creator_id or 1,
+        "created_at": db_step.created_at.isoformat() if db_step.created_at else None,
+        "updated_at": db_step.updated_at.isoformat() if db_step.updated_at else None,
+    }
 
 @router.get("/{step_id}", response_model=TestStepResponse)
 async def get_test_step(step_id: int, db: Session = Depends(get_db)):

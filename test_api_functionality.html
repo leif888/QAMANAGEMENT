@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QA Management System - API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            border: 1px solid #ddd;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .success {
+            color: green;
+            background: #e6ffe6;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .error {
+            color: red;
+            background: #ffe6e6;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .result {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>QA Management System - API Functionality Test</h1>
+    
+    <!-- Projects Section -->
+    <div class="section">
+        <h3>1. Projects Management</h3>
+        <button onclick="testGetProjects()">Get All Projects</button>
+        <button onclick="showCreateProjectForm()">Create New Project</button>
+        
+        <div id="create-project-form" style="display: none;">
+            <div class="form-group">
+                <label>Project Name:</label>
+                <input type="text" id="project-name" placeholder="Enter project name">
+            </div>
+            <div class="form-group">
+                <label>Description:</label>
+                <textarea id="project-description" placeholder="Enter project description"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Status:</label>
+                <select id="project-status">
+                    <option value="active">Active</option>
+                    <option value="paused">Paused</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+            <button onclick="createProject()">Create Project</button>
+            <button onclick="hideCreateProjectForm()">Cancel</button>
+        </div>
+        
+        <div id="projects-result"></div>
+    </div>
+
+    <!-- Test Steps Section -->
+    <div class="section">
+        <h3>2. Test Steps Management</h3>
+        <button onclick="testGetTestSteps()">Get All Test Steps</button>
+        <button onclick="showCreateStepForm()">Create New Test Step</button>
+        
+        <div id="create-step-form" style="display: none;">
+            <div class="form-group">
+                <label>Step Name:</label>
+                <input type="text" id="step-name" placeholder="Enter step name">
+            </div>
+            <div class="form-group">
+                <label>Description:</label>
+                <textarea id="step-description" placeholder="Enter step description"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Type:</label>
+                <select id="step-type">
+                    <option value="action">Action</option>
+                    <option value="verification">Verification</option>
+                    <option value="setup">Setup</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Decorator:</label>
+                <input type="text" id="step-decorator" placeholder="e.g., @given, @when, @then">
+            </div>
+            <div class="form-group">
+                <label>Function Name:</label>
+                <input type="text" id="step-function" placeholder="Python function name">
+            </div>
+            <div class="form-group">
+                <label>Usage Example:</label>
+                <textarea id="step-example" placeholder="Example: user navigate to folder {folder_a} -> {folder_b} and perform action {action_x}"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Project ID:</label>
+                <input type="number" id="step-project-id" value="4" placeholder="Project ID">
+            </div>
+            <button onclick="createTestStep()">Create Test Step</button>
+            <button onclick="hideCreateStepForm()">Cancel</button>
+        </div>
+        
+        <div id="test-steps-result"></div>
+    </div>
+
+    <!-- Test Data Tree Section -->
+    <div class="section">
+        <h3>3. Test Data Tree Structure</h3>
+        <button onclick="testGetTestDataTree()">Get Test Data Tree</button>
+        <button onclick="showCreateDataNodeForm()">Create Data Node</button>
+        
+        <div id="create-data-node-form" style="display: none;">
+            <div class="form-group">
+                <label>Node Name:</label>
+                <input type="text" id="data-node-name" placeholder="Enter node name">
+            </div>
+            <div class="form-group">
+                <label>Node Type:</label>
+                <select id="data-node-type">
+                    <option value="folder">Folder</option>
+                    <option value="template">Jinja2 Template</option>
+                    <option value="data">Data</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Description:</label>
+                <textarea id="data-node-description" placeholder="Enter description"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Jinja2 Template (if template type):</label>
+                <textarea id="data-node-template" placeholder="Enter Jinja2 template content"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Project ID:</label>
+                <input type="number" id="data-node-project-id" value="4" placeholder="Project ID">
+            </div>
+            <button onclick="createDataNode()">Create Data Node</button>
+            <button onclick="hideCreateDataNodeForm()">Cancel</button>
+        </div>
+        
+        <div id="test-data-tree-result"></div>
+    </div>
+
+    <!-- Test Cases Tree Section -->
+    <div class="section">
+        <h3>4. Test Cases Tree Structure</h3>
+        <button onclick="testGetTestCasesTree()">Get Test Cases Tree</button>
+        <button onclick="testGetTestCasesList()">Get Test Cases List</button>
+        <div id="test-cases-tree-result"></div>
+    </div>
+
+    <!-- Test Executions Section -->
+    <div class="section">
+        <h3>5. Test Executions (Multi-select)</h3>
+        <button onclick="testGetTestExecutions()">Get Test Executions</button>
+        <button onclick="showCreateExecutionForm()">Create Multi-Case Execution</button>
+        
+        <div id="create-execution-form" style="display: none;">
+            <div class="form-group">
+                <label>Execution Name:</label>
+                <input type="text" id="execution-name" placeholder="Enter execution name">
+            </div>
+            <div class="form-group">
+                <label>Test Case IDs (comma-separated):</label>
+                <input type="text" id="execution-case-ids" placeholder="e.g., 1,2,3">
+            </div>
+            <div class="form-group">
+                <label>Project ID:</label>
+                <input type="number" id="execution-project-id" value="4" placeholder="Project ID">
+            </div>
+            <button onclick="createTestExecution()">Create Execution</button>
+            <button onclick="hideCreateExecutionForm()">Cancel</button>
+        </div>
+        
+        <div id="test-executions-result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1';
+        
+        // Utility functions
+        function showResult(elementId, content, isError = false) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="${isError ? 'error' : 'success'}">${content}</div>`;
+        }
+        
+        function showData(elementId, data) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="result"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+        }
+
+        // Projects functions
+        async function testGetProjects() {
+            try {
+                const response = await fetch(`${API_BASE}/projects`);
+                const data = await response.json();
+                showData('projects-result', data);
+            } catch (error) {
+                showResult('projects-result', `Error: ${error.message}`, true);
+            }
+        }
+
+        function showCreateProjectForm() {
+            document.getElementById('create-project-form').style.display = 'block';
+        }
+
+        function hideCreateProjectForm() {
+            document.getElementById('create-project-form').style.display = 'none';
+        }
+
+        async function createProject() {
+            try {
+                const data = {
+                    name: document.getElementById('project-name').value,
+                    description: document.getElementById('project-description').value,
+                    status: document.getElementById('project-status').value
+                };
+                
+                const response = await fetch(`${API_BASE}/projects`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                showData('projects-result', result);
+                hideCreateProjectForm();
+            } catch (error) {
+                showResult('projects-result', `Error: ${error.message}`, true);
+            }
+        }
+
+        // Test Steps functions
+        async function testGetTestSteps() {
+            try {
+                const response = await fetch(`${API_BASE}/test-steps?project_id=4`);
+                const data = await response.json();
+                showData('test-steps-result', data);
+            } catch (error) {
+                showResult('test-steps-result', `Error: ${error.message}`, true);
+            }
+        }
+
+        function showCreateStepForm() {
+            document.getElementById('create-step-form').style.display = 'block';
+        }
+
+        function hideCreateStepForm() {
+            document.getElementById('create-step-form').style.display = 'none';
+        }
+
+        async function createTestStep() {
+            try {
+                const data = {
+                    name: document.getElementById('step-name').value,
+                    description: document.getElementById('step-description').value,
+                    type: document.getElementById('step-type').value,
+                    decorator: document.getElementById('step-decorator').value,
+                    function_name: document.getElementById('step-function').value,
+                    usage_example: document.getElementById('step-example').value,
+                    project_id: parseInt(document.getElementById('step-project-id').value),
+                    parameters: []
+                };
+                
+                const response = await fetch(`${API_BASE}/test-steps`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                showData('test-steps-result', result);
+                hideCreateStepForm();
+            } catch (error) {
+                showResult('test-steps-result', `Error: ${error.message}`, true);
+            }
+        }
+
+        // Test Data Tree functions
+        async function testGetTestDataTree() {
+            try {
+                const response = await fetch(`${API_BASE}/test-data/tree?project_id=4`);
+                const data = await response.json();
+                showData('test-data-tree-result', data);
+            } catch (error) {
+                showResult('test-data-tree-result', `Error: ${error.message}`, true);
+            }
+        }
+
+        function showCreateDataNodeForm() {
+            document.getElementById('create-data-node-form').style.display = 'block';
+        }
+
+        function hideCreateDataNodeForm() {
+            document.getElementById('create-data-node-form').style.display = 'none';
+        }
+
+        async function createDataNode() {
+            try {
+                const data = {
+                    name: document.getElementById('data-node-name').value,
+                    node_type: document.getElementById('data-node-type').value,
+                    description: document.getElementById('data-node-description').value,
+                    jinja2_template: document.getElementById('data-node-template').value,
+                    project_id: parseInt(document.getElementById('data-node-project-id').value)
+                };
+                
+                const response = await fetch(`${API_BASE}/test-data/nodes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                showData('test-data-tree-result', result);
+                hideCreateDataNodeForm();
+            } catch (error) {
+                showResult('test-data-tree-result', `Error: ${error.message}`, true);
+            }
+        }
+
+        // Test Cases Tree functions
+        async function testGetTestCasesTree() {
+            try {
+                const response = await fetch(`${API_BASE}/test-cases/tree?project_id=4`);
+                const data = await response.json();
+                showData('test-cases-tree-result', data);
+            } catch (error) {
+                showResult('test-cases-tree-result', `Error: ${error.message}`, true);
+            }
+        }
+
+        async function testGetTestCasesList() {
+            try {
+                const response = await fetch(`${API_BASE}/test-cases?project_id=4`);
+                const data = await response.json();
+                showData('test-cases-tree-result', data);
+            } catch (error) {
+                showResult('test-cases-tree-result', `Error: ${error.message}`, true);
+            }
+        }
+
+        // Test Executions functions
+        async function testGetTestExecutions() {
+            try {
+                const response = await fetch(`${API_BASE}/test-executions?project_id=4`);
+                const data = await response.json();
+                showData('test-executions-result', data);
+            } catch (error) {
+                showResult('test-executions-result', `Error: ${error.message}`, true);
+            }
+        }
+
+        function showCreateExecutionForm() {
+            document.getElementById('create-execution-form').style.display = 'block';
+        }
+
+        function hideCreateExecutionForm() {
+            document.getElementById('create-execution-form').style.display = 'none';
+        }
+
+        async function createTestExecution() {
+            try {
+                const caseIds = document.getElementById('execution-case-ids').value
+                    .split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+                
+                const data = {
+                    name: document.getElementById('execution-name').value,
+                    test_case_ids: caseIds,
+                    project_id: parseInt(document.getElementById('execution-project-id').value)
+                };
+                
+                const response = await fetch(`${API_BASE}/test-executions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                showData('test-executions-result', result);
+                hideCreateExecutionForm();
+            } catch (error) {
+                showResult('test-executions-result', `Error: ${error.message}`, true);
+            }
+        }
+    </script>
+</body>
+</html>

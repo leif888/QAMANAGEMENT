@@ -1,6 +1,8 @@
-import React, { useState } from 'react'
-import { Typography, Button, Table, Space, Tag, Modal, Form, Input, Select, message } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Typography, Button, Table, Space, Tag, Modal, Form, Input, Select, message, Spin } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { projectApi } from '@/services/api'
+import type { Project } from '@/types'
 
 const { Title } = Typography
 const { TextArea } = Input
@@ -9,31 +11,28 @@ const { Option } = Select
 const Projects: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
-  const [editingProject, setEditingProject] = useState<any>(null)
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [form] = Form.useForm()
-  const [dataSource, setDataSource] = useState([
-    {
-      key: '1',
-      name: 'E-commerce Platform Testing',
-      description: 'Core functionality testing for e-commerce platform',
-      status: 'active',
-      createdAt: '2024-01-15',
-    },
-    {
-      key: '2',
-      name: 'User Management System',
-      description: 'User registration, login, and permission management testing',
-      status: 'active',
-      createdAt: '2024-01-10',
-    },
-    {
-      key: '3',
-      name: 'Payment Module Testing',
-      description: 'Payment process and security testing',
-      status: 'paused',
-      createdAt: '2024-01-05',
-    },
-  ])
+  const [dataSource, setDataSource] = useState<Project[]>([])
+  const [loading, setLoading] = useState(false)
+
+  // Load projects on component mount
+  useEffect(() => {
+    loadProjects()
+  }, [])
+
+  const loadProjects = async () => {
+    try {
+      setLoading(true)
+      const response = await projectApi.getProjects()
+      setDataSource(response || [])
+    } catch (error) {
+      console.error('Failed to load projects:', error)
+      message.error('Failed to load projects')
+    } finally {
+      setLoading(false)
+    }
+  }
   const columns = [
     {
       title: 'Project Name',
@@ -50,20 +49,21 @@ const Projects: React.FC = () => {
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => (
-        <Tag color={status === 'active' ? 'green' : 'orange'}>
-          {status === 'active' ? 'Active' : 'Paused'}
+        <Tag color={status === 'active' ? 'green' : status === 'paused' ? 'orange' : 'blue'}>
+          {status?.charAt(0).toUpperCase() + status?.slice(1) || 'Unknown'}
         </Tag>
       ),
     },
     {
       title: 'Created At',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (date: string) => date ? new Date(date).toLocaleDateString() : '-',
     },
     {
       title: 'Actions',
       key: 'action',
-      render: (_, record) => (
+      render: (_, record: Project) => (
         <Space size="middle">
           <Button
             type="link"
@@ -78,7 +78,7 @@ const Projects: React.FC = () => {
             danger
             icon={<DeleteOutlined />}
             size="small"
-            onClick={() => handleDelete(record.key)}
+            onClick={() => handleDelete(record.id)}
           >
             Delete
           </Button>
@@ -92,41 +92,20 @@ const Projects: React.FC = () => {
   const handleCreateProject = async () => {
     try {
       const values = await form.validateFields()
-      console.log('Creating project:', values)
+      setLoading(true)
 
       if (isEditMode && editingProject) {
         // Update existing project
-        const updatedProject = {
-          ...editingProject,
-          name: values.name,
-          description: values.description,
-          status: values.status,
-        }
-
-        setDataSource(prevData =>
-          prevData.map(item =>
-            item.key === editingProject.key ? updatedProject : item
-          )
-        )
-
+        await projectApi.updateProject(editingProject.id, values)
         message.success('Project updated successfully!')
       } else {
         // Create new project
-        const newProject = {
-          key: Date.now().toString(), // Use timestamp as unique key
-          name: values.name,
-          description: values.description,
-          status: values.status,
-          createdAt: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
-        }
-
-        // Add to data source
-        setDataSource(prevData => [...prevData, newProject])
-
+        await projectApi.createProject(values)
         message.success('Project created successfully!')
       }
 
-      // TODO: Call API to create/update project
+      // Reload projects
+      await loadProjects()
 
       setIsModalVisible(false)
       setIsEditMode(false)
@@ -134,11 +113,14 @@ const Projects: React.FC = () => {
       form.resetFields()
 
     } catch (error) {
-      message.error('Please fill in all required fields')
+      console.error('Failed to save project:', error)
+      message.error('Failed to save project')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleEdit = (record: any) => {
+  const handleEdit = (record: Project) => {
     setIsEditMode(true)
     setEditingProject(record)
     form.setFieldsValue({
@@ -149,17 +131,22 @@ const Projects: React.FC = () => {
     setIsModalVisible(true)
   }
 
-  const handleDelete = (key: string) => {
+  const handleDelete = (id: number) => {
     Modal.confirm({
       title: 'Delete Project',
       content: 'Are you sure you want to delete this project? This action cannot be undone.',
       okText: 'Delete',
       okType: 'danger',
       cancelText: 'Cancel',
-      onOk() {
-        setDataSource(prevData => prevData.filter(item => item.key !== key))
-        message.success('Project deleted successfully!')
-        // TODO: Call API to delete project
+      onOk: async () => {
+        try {
+          await projectApi.deleteProject(id)
+          message.success('Project deleted successfully!')
+          await loadProjects()
+        } catch (error) {
+          console.error('Failed to delete project:', error)
+          message.error('Failed to delete project')
+        }
       },
     })
   }
@@ -187,6 +174,8 @@ const Projects: React.FC = () => {
       <Table
         columns={columns}
         dataSource={dataSource}
+        loading={loading}
+        rowKey="id"
         pagination={{
           total: dataSource.length,
           pageSize: 10,

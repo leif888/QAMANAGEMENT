@@ -2,11 +2,11 @@
 
 export interface BaseEntity {
   id: number
-  createdAt: string
-  updatedAt: string
+  created_at: string
+  updated_at: string
 }
 
-// 项目相关类型
+// Project related types
 export interface Project extends BaseEntity {
   name: string
   description: string

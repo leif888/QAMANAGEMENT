@@ -1,85 +1,142 @@
-import React, { useState } from 'react'
-import { Typography, Button, Table, Space, Tag, Modal, Form, Input, Select, message } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons'
+import React, { useState, useEffect } from 'react'
+import { Typography, Button, Table, Space, Tag, Modal, Form, Input, Select, message, Card, Tooltip } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { testStepApi, projectApi } from '@/services/api'
+import type { TestStep, Project } from '@/types'
 
 const { Title } = Typography
 const { TextArea } = Input
 const { Option } = Select
 
+interface ExtendedTestStep extends TestStep {
+  decorator?: string
+  usage_example?: string
+  function_name?: string
+  creator_id?: number
+}
+
 const TestSteps: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
-  const [editingStep, setEditingStep] = useState<any>(null)
+  const [editingStep, setEditingStep] = useState<ExtendedTestStep | null>(null)
   const [form] = Form.useForm()
-  const [dataSource, setDataSource] = useState([
-    {
-      key: '1',
-      name: 'User Login',
-      description: 'Enter username and password to login',
-      type: 'action',
-      parameters: ['username', 'password'],
-      usageCount: 15,
-    },
-    {
-      key: '2',
-      name: 'Verify Login Success',
-      description: 'Verify user successfully logged into the system',
-      type: 'verification',
-      parameters: ['expectedUrl'],
-      usageCount: 12,
-    },
-    {
-      key: '3',
-      name: 'Prepare Test User',
-      description: 'Create test user data',
-      type: 'setup',
-      parameters: ['userType', 'permissions'],
-      usageCount: 8,
-    },
-  ])
+  const [dataSource, setDataSource] = useState<ExtendedTestStep[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(false)
+  const [selectedProject, setSelectedProject] = useState<number | null>(null)
+
+  useEffect(() => {
+    loadProjects()
+  }, [])
+
+  useEffect(() => {
+    if (selectedProject) {
+      loadTestSteps()
+    }
+  }, [selectedProject])
+
+  const loadProjects = async () => {
+    try {
+      const response = await projectApi.getProjects()
+      setProjects(response || [])
+    } catch (error) {
+      console.error('Failed to load projects:', error)
+      message.error('Failed to load projects')
+    }
+  }
+
+  const loadTestSteps = async () => {
+    if (!selectedProject) return
+
+    try {
+      setLoading(true)
+      const response = await testStepApi.getTestSteps()
+      // Filter by project if needed (API should support this)
+      setDataSource(response || [])
+    } catch (error) {
+      console.error('Failed to load test steps:', error)
+      message.error('Failed to load test steps')
+    } finally {
+      setLoading(false)
+    }
+  }
   const columns = [
     {
       title: 'Step Name',
       dataIndex: 'name',
       key: 'name',
+      width: 200,
     },
     {
-      title: 'Description',
-      dataIndex: 'description',
-      key: 'description',
+      title: 'Decorator',
+      dataIndex: 'decorator',
+      key: 'decorator',
+      width: 100,
+      render: (decorator: string) => decorator ? (
+        <Tag color="purple">{decorator}</Tag>
+      ) : '-',
     },
     {
       title: 'Type',
       dataIndex: 'type',
       key: 'type',
+      width: 120,
       render: (type: string) => (
         <Tag color={type === 'action' ? 'blue' : type === 'verification' ? 'green' : 'orange'}>
-          {type === 'action' ? 'Action Step' : type === 'verification' ? 'Verification Step' : 'Data Setup'}
+          {type?.charAt(0).toUpperCase() + type?.slice(1) || 'Unknown'}
         </Tag>
       ),
     },
     {
-      title: 'Parameters',
-      dataIndex: 'parameters',
-      key: 'parameters',
-      render: (params: string[]) => (
-        <Space>
-          {params?.map((param, index) => (
-            <Tag key={index} color="default">{param}</Tag>
-          ))}
-        </Space>
-      ),
+      title: 'Function Name',
+      dataIndex: 'function_name',
+      key: 'function_name',
+      width: 150,
+      render: (name: string) => name ? (
+        <code style={{ background: '#f5f5f5', padding: '2px 4px', borderRadius: '3px' }}>
+          {name}
+        </code>
+      ) : '-',
+    },
+    {
+      title: 'Usage Example',
+      dataIndex: 'usage_example',
+      key: 'usage_example',
+      width: 250,
+      render: (example: string) => example ? (
+        <Tooltip title={example}>
+          <div style={{
+            maxWidth: 200,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}>
+            {example}
+          </div>
+        </Tooltip>
+      ) : '-',
     },
     {
       title: 'Usage Count',
-      dataIndex: 'usageCount',
-      key: 'usageCount',
+      dataIndex: 'usage_count',
+      key: 'usage_count',
+      width: 100,
+      sorter: (a: ExtendedTestStep, b: ExtendedTestStep) => (a.usage_count || 0) - (b.usage_count || 0),
     },
     {
       title: 'Actions',
       key: 'action',
-      render: (_, record) => (
+      width: 150,
+      render: (_, record: ExtendedTestStep) => (
         <Space size="middle">
+          <Tooltip title="View Details">
+            <Button
+              type="link"
+              icon={<InfoCircleOutlined />}
+              size="small"
+              onClick={() => showStepDetails(record)}
+            />
+          </Tooltip>
           <Button
             type="link"
             icon={<EditOutlined />}
@@ -101,7 +158,7 @@ const TestSteps: React.FC = () => {
             danger
             icon={<DeleteOutlined />}
             size="small"
-            onClick={() => handleDelete(record.key)}
+            onClick={() => handleDelete(record.id)}
           >
             Delete
           </Button>
@@ -110,96 +167,127 @@ const TestSteps: React.FC = () => {
     },
   ]
 
-
+  const showStepDetails = (step: ExtendedTestStep) => {
+    Modal.info({
+      title: `Test Step Details: ${step.name}`,
+      width: 600,
+      content: (
+        <div>
+          <Card size="small" style={{ marginBottom: 16 }}>
+            <p><strong>Description:</strong> {step.description || 'No description'}</p>
+            <p><strong>Type:</strong> {step.type}</p>
+            <p><strong>Decorator:</strong> {step.decorator || 'None'}</p>
+            <p><strong>Function Name:</strong> {step.function_name || 'None'}</p>
+            <p><strong>Usage Count:</strong> {step.usage_count || 0}</p>
+          </Card>
+          {step.usage_example && (
+            <Card size="small" title="Usage Example">
+              <pre style={{ background: '#f5f5f5', padding: 8, borderRadius: 4 }}>
+                {step.usage_example}
+              </pre>
+            </Card>
+          )}
+        </div>
+      ),
+    })
+  }
 
   const handleCreateStep = async () => {
+    if (!selectedProject) {
+      message.error('Please select a project first')
+      return
+    }
+
     try {
       const values = await form.validateFields()
-      console.log('Creating/updating test step:', values)
+      setLoading(true)
+
+      const stepData = {
+        ...values,
+        project_id: selectedProject,
+        parameters: values.parameters ? values.parameters.split(',').map((p: string) => p.trim()) : [],
+      }
 
       if (isEditMode && editingStep) {
-        // Update existing step
-        const updatedStep = {
-          ...editingStep,
-          name: values.name,
-          description: values.description,
-          type: values.type,
-          parameters: values.parameters ? values.parameters.split(',').map((p: string) => p.trim()) : [],
-        }
-
-        setDataSource(prevData =>
-          prevData.map(item =>
-            item.key === editingStep.key ? updatedStep : item
-          )
-        )
-
+        await testStepApi.updateTestStep(editingStep.id, stepData)
         message.success('Test step updated successfully!')
       } else {
-        // Create new step object
-        const newStep = {
-          key: Date.now().toString(), // Use timestamp as unique key
-          name: values.name,
-          description: values.description,
-          type: values.type,
-          parameters: values.parameters ? values.parameters.split(',').map((p: string) => p.trim()) : [],
-          usageCount: 0, // New step starts with 0 usage
-        }
-
-        // Add to data source
-        setDataSource(prevData => [...prevData, newStep])
-
+        await testStepApi.createTestStep(stepData)
         message.success('Test step created successfully!')
       }
 
-      // TODO: Call API to create/update test step
-
+      await loadTestSteps()
       setIsModalVisible(false)
       setIsEditMode(false)
       setEditingStep(null)
       form.resetFields()
 
     } catch (error) {
-      message.error('Please fill in all required fields')
+      console.error('Failed to save test step:', error)
+      message.error('Failed to save test step')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleEdit = (record: any) => {
+  const handleEdit = (record: ExtendedTestStep) => {
     setIsEditMode(true)
     setEditingStep(record)
     form.setFieldsValue({
       name: record.name,
       description: record.description,
       type: record.type,
+      decorator: record.decorator,
+      usage_example: record.usage_example,
+      function_name: record.function_name,
       parameters: record.parameters ? record.parameters.join(', ') : '',
     })
     setIsModalVisible(true)
   }
 
-  const handleCopy = (record: any) => {
-    const copiedStep = {
-      key: Date.now().toString(),
-      name: `${record.name} (Copy)`,
-      description: record.description,
-      type: record.type,
-      parameters: record.parameters,
-      usageCount: 0,
+  const handleCopy = async (record: ExtendedTestStep) => {
+    if (!selectedProject) {
+      message.error('Please select a project first')
+      return
     }
 
-    setDataSource(prevData => [...prevData, copiedStep])
-    message.success('Test step copied successfully!')
+    try {
+      const copyData = {
+        name: `${record.name} (Copy)`,
+        description: record.description,
+        type: record.type,
+        decorator: record.decorator,
+        usage_example: record.usage_example,
+        function_name: record.function_name,
+        project_id: selectedProject,
+        parameters: record.parameters || [],
+      }
+
+      await testStepApi.createTestStep(copyData)
+      message.success('Test step copied successfully!')
+      await loadTestSteps()
+    } catch (error) {
+      console.error('Failed to copy test step:', error)
+      message.error('Failed to copy test step')
+    }
   }
 
-  const handleDelete = (key: string) => {
+  const handleDelete = (id: number) => {
     Modal.confirm({
       title: 'Delete Test Step',
       content: 'Are you sure you want to delete this test step? This action cannot be undone.',
       okText: 'Delete',
       okType: 'danger',
       cancelText: 'Cancel',
-      onOk() {
-        setDataSource(prevData => prevData.filter(item => item.key !== key))
-        message.success('Test step deleted successfully!')
-        // TODO: Call API to delete test step
+      onOk: async () => {
+        try {
+          await testStepApi.deleteTestStep(id)
+          message.success('Test step deleted successfully!')
+          await loadTestSteps()
+        } catch (error) {
+          console.error('Failed to delete test step:', error)
+          message.error('Failed to delete test step')
+        }
       },
     })
   }
@@ -215,26 +303,63 @@ const TestSteps: React.FC = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <Title level={2}>Test Step Management</Title>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => setIsModalVisible(true)}
-        >
-          New Step
-        </Button>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <div>
+            <label style={{ marginRight: 8 }}>Project:</label>
+            <Select
+              style={{ width: 200 }}
+              placeholder="Select a project"
+              value={selectedProject}
+              onChange={setSelectedProject}
+              loading={loading}
+            >
+              {projects.map(project => (
+                <Option key={project.id} value={project.id}>
+                  {project.name}
+                </Option>
+              ))}
+            </Select>
+          </div>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setIsModalVisible(true)}
+            disabled={!selectedProject}
+          >
+            New Step
+          </Button>
+        </div>
       </div>
-      
-      <Table
-        columns={columns}
-        dataSource={dataSource}
-        pagination={{
-          total: dataSource.length,
-          pageSize: 10,
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (total) => `Total ${total} records`,
-        }}
-      />
+
+      {!selectedProject && (
+        <div style={{
+          textAlign: 'center',
+          padding: '40px',
+          background: '#f5f5f5',
+          borderRadius: '8px',
+          marginBottom: '24px'
+        }}>
+          <p style={{ fontSize: '16px', color: '#666' }}>
+            Please select a project to view and manage test steps
+          </p>
+        </div>
+      )}
+
+      {selectedProject && (
+        <Table
+          columns={columns}
+          dataSource={dataSource}
+          loading={loading}
+          rowKey="id"
+          pagination={{
+            total: dataSource.length,
+            pageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total) => `Total ${total} records`,
+          }}
+        />
+      )}
 
       {/* Create/Edit Test Step Modal */}
       <Modal

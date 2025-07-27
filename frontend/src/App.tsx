@@ -6,11 +6,12 @@ import AppSidebar from './components/layout/AppSidebar'
 import Dashboard from './pages/Dashboard'
 import TestSteps from './pages/TestSteps'
 import TestData from './pages/TestData'
-import TestCases from './pages/TestCases'
+import TestCases from './pages/TestCasesEnhanced'
 import TestCaseDetail from './pages/TestCaseDetail'
 import TestExecutions from './pages/TestExecutions'
 import TestExecutionDetail from './pages/TestExecutionDetail'
 import TestReport from './pages/TestReport'
+import TradeTemplates from './pages/TradeTemplates'
 import Projects from './pages/Projects'
 
 const { Content } = Layout
@@ -32,6 +33,7 @@ function App() {
             <Route path="/test-executions" element={<TestExecutions />} />
             <Route path="/test-executions/detail" element={<TestExecutionDetail />} />
             <Route path="/test-executions/report" element={<TestReport />} />
+            <Route path="/trade-templates" element={<TradeTemplates />} />
           </Routes>
         </Content>
       </Layout>

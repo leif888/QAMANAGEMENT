@@ -5,6 +5,11 @@ sqlalchemy
 pydantic
 pydantic-settings
 
+# MongoDB dependencies
+motor
+pymongo
+jinja2
+
 # Test execution dependencies
 pytest==7.4.3
 pytest-bdd==7.0.0

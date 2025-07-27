@@ -1,5 +1,5 @@
 """
-API v1 路由汇总
+API v1 Route Configuration
 """
 from fastapi import APIRouter
 from app.api.api_v1.endpoints import (
@@ -7,13 +7,15 @@ from app.api.api_v1.endpoints import (
     test_data,
     test_cases,
     test_executions,
-    projects
+    projects,
+    trade_templates,
+    test_case_files
 )
 
-# 创建API路由器
+# Create API router
 api_router = APIRouter()
 
-# 包含各个模块的路由
+# Include module routes
 api_router.include_router(
     projects.router, 
     prefix="/projects", 
@@ -39,7 +41,19 @@ api_router.include_router(
 )
 
 api_router.include_router(
-    test_executions.router, 
-    prefix="/test-executions", 
+    test_executions.router,
+    prefix="/test-executions",
     tags=["test-executions"]
+)
+
+api_router.include_router(
+    trade_templates.router,
+    prefix="/trade-templates",
+    tags=["trade-templates"]
+)
+
+api_router.include_router(
+    test_case_files.router,
+    prefix="/test-case-files",
+    tags=["test-case-files"]
 )
