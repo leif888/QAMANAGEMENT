@@ -16,7 +16,6 @@ class TestCaseFileCreate(BaseModel):
     file_type: str  # "feature" or "yaml"
     content: str = ""
     test_case_id: int
-    project_id: int
     creator_id: int = 1
 
 class TestCaseFileUpdate(BaseModel):
@@ -30,7 +29,6 @@ class TestCaseFileResponse(BaseModel):
     file_type: str
     content: str = ""
     test_case_id: int
-    project_id: int
     creator_id: int
     is_active: bool = True
     version: str = "v1.0"
@@ -46,19 +44,15 @@ class TestCaseFileResponse(BaseModel):
 @router.get("/")
 async def get_test_case_files(
     test_case_id: Optional[int] = Query(None, description="Test case ID filter"),
-    project_id: Optional[int] = Query(None, description="Project ID filter"),
     file_type: Optional[str] = Query(None, description="File type filter"),
     db: Session = Depends(get_db)
 ):
     """Get test case files"""
     query = db.query(TestCaseFile).filter(TestCaseFile.is_active == True)
-    
+
     if test_case_id:
         query = query.filter(TestCaseFile.test_case_id == test_case_id)
-    
-    if project_id:
-        query = query.filter(TestCaseFile.project_id == project_id)
-    
+
     if file_type:
         query = query.filter(TestCaseFile.file_type == FileType(file_type))
     
@@ -72,7 +66,6 @@ async def get_test_case_files(
             "file_type": file.file_type.value,
             "content": file.content or "",
             "test_case_id": file.test_case_id,
-            "project_id": file.project_id,
             "creator_id": file.creator_id,
             "is_active": file.is_active,
             "version": file.version,
@@ -111,7 +104,6 @@ async def create_test_case_file(file: TestCaseFileCreate, db: Session = Depends(
         file_type=FileType(file.file_type),
         content=file.content,
         test_case_id=file.test_case_id,
-        project_id=file.project_id,
         creator_id=file.creator_id,
     )
     
@@ -125,7 +117,6 @@ async def create_test_case_file(file: TestCaseFileCreate, db: Session = Depends(
         "file_type": db_file.file_type.value,
         "content": db_file.content or "",
         "test_case_id": db_file.test_case_id,
-        "project_id": db_file.project_id,
         "creator_id": db_file.creator_id,
         "is_active": db_file.is_active,
         "version": db_file.version,
@@ -150,7 +141,6 @@ async def get_test_case_file(file_id: int, db: Session = Depends(get_db)):
         "file_type": file.file_type.value,
         "content": file.content or "",
         "test_case_id": file.test_case_id,
-        "project_id": file.project_id,
         "creator_id": file.creator_id,
         "is_active": file.is_active,
         "version": file.version,
@@ -198,7 +188,6 @@ async def update_test_case_file(file_id: int, file: TestCaseFileUpdate, db: Sess
         "file_type": db_file.file_type.value,
         "content": db_file.content or "",
         "test_case_id": db_file.test_case_id,
-        "project_id": db_file.project_id,
         "creator_id": db_file.creator_id,
         "is_active": db_file.is_active,
         "version": db_file.version,

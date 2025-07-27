@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Typography, Button, Table, Space, Tag, Modal, Form, Input, Select, message, Card, Tooltip } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, InfoCircleOutlined } from '@ant-design/icons'
-import { testStepApi, projectApi } from '@/services/api'
-import type { TestStep, Project } from '@/types'
+import { testStepApi } from '@/services/api'
+import type { TestStep } from '@/types'
 
 const { Title } = Typography
 const { TextArea } = Input
@@ -21,37 +21,16 @@ const TestSteps: React.FC = () => {
   const [editingStep, setEditingStep] = useState<ExtendedTestStep | null>(null)
   const [form] = Form.useForm()
   const [dataSource, setDataSource] = useState<ExtendedTestStep[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(false)
-  const [selectedProject, setSelectedProject] = useState<number | null>(null)
 
   useEffect(() => {
-    loadProjects()
+    loadTestSteps()
   }, [])
 
-  useEffect(() => {
-    if (selectedProject) {
-      loadTestSteps()
-    }
-  }, [selectedProject])
-
-  const loadProjects = async () => {
-    try {
-      const response = await projectApi.getProjects()
-      setProjects(response || [])
-    } catch (error) {
-      console.error('Failed to load projects:', error)
-      message.error('Failed to load projects')
-    }
-  }
-
   const loadTestSteps = async () => {
-    if (!selectedProject) return
-
     try {
       setLoading(true)
       const response = await testStepApi.getTestSteps()
-      // Filter by project if needed (API should support this)
       setDataSource(response || [])
     } catch (error) {
       console.error('Failed to load test steps:', error)
@@ -68,15 +47,6 @@ const TestSteps: React.FC = () => {
       width: 200,
     },
     {
-      title: 'Decorator',
-      dataIndex: 'decorator',
-      key: 'decorator',
-      width: 100,
-      render: (decorator: string) => decorator ? (
-        <Tag color="purple">{decorator}</Tag>
-      ) : '-',
-    },
-    {
       title: 'Type',
       dataIndex: 'type',
       key: 'type',
@@ -86,6 +56,17 @@ const TestSteps: React.FC = () => {
           {type?.charAt(0).toUpperCase() + type?.slice(1) || 'Unknown'}
         </Tag>
       ),
+    },
+    {
+      title: 'Function Decorator',
+      dataIndex: 'decorator',
+      key: 'decorator',
+      width: 120,
+      render: (decorator: string) => decorator ? (
+        <code style={{ background: '#e6f7ff', padding: '2px 4px', borderRadius: '3px', color: '#1890ff' }}>
+          {decorator}
+        </code>
+      ) : '-',
     },
     {
       title: 'Function Name',
@@ -116,13 +97,7 @@ const TestSteps: React.FC = () => {
         </Tooltip>
       ) : '-',
     },
-    {
-      title: 'Usage Count',
-      dataIndex: 'usage_count',
-      key: 'usage_count',
-      width: 100,
-      sorter: (a: ExtendedTestStep, b: ExtendedTestStep) => (a.usage_count || 0) - (b.usage_count || 0),
-    },
+
     {
       title: 'Actions',
       key: 'action',
@@ -178,7 +153,7 @@ const TestSteps: React.FC = () => {
             <p><strong>Type:</strong> {step.type}</p>
             <p><strong>Decorator:</strong> {step.decorator || 'None'}</p>
             <p><strong>Function Name:</strong> {step.function_name || 'None'}</p>
-            <p><strong>Usage Count:</strong> {step.usage_count || 0}</p>
+
           </Card>
           {step.usage_example && (
             <Card size="small" title="Usage Example">
@@ -193,18 +168,12 @@ const TestSteps: React.FC = () => {
   }
 
   const handleCreateStep = async () => {
-    if (!selectedProject) {
-      message.error('Please select a project first')
-      return
-    }
-
     try {
       const values = await form.validateFields()
       setLoading(true)
 
       const stepData = {
         ...values,
-        project_id: selectedProject,
         parameters: values.parameters ? values.parameters.split(',').map((p: string) => p.trim()) : [],
       }
 
@@ -303,63 +272,28 @@ const TestSteps: React.FC = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <Title level={2}>Test Step Management</Title>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <div>
-            <label style={{ marginRight: 8 }}>Project:</label>
-            <Select
-              style={{ width: 200 }}
-              placeholder="Select a project"
-              value={selectedProject}
-              onChange={setSelectedProject}
-              loading={loading}
-            >
-              {projects.map(project => (
-                <Option key={project.id} value={project.id}>
-                  {project.name}
-                </Option>
-              ))}
-            </Select>
-          </div>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => setIsModalVisible(true)}
-            disabled={!selectedProject}
-          >
-            New Step
-          </Button>
-        </div>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => setIsModalVisible(true)}
+        >
+          New Step
+        </Button>
       </div>
 
-      {!selectedProject && (
-        <div style={{
-          textAlign: 'center',
-          padding: '40px',
-          background: '#f5f5f5',
-          borderRadius: '8px',
-          marginBottom: '24px'
-        }}>
-          <p style={{ fontSize: '16px', color: '#666' }}>
-            Please select a project to view and manage test steps
-          </p>
-        </div>
-      )}
-
-      {selectedProject && (
-        <Table
-          columns={columns}
-          dataSource={dataSource}
-          loading={loading}
-          rowKey="id"
-          pagination={{
-            total: dataSource.length,
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total) => `Total ${total} records`,
-          }}
-        />
-      )}
+      <Table
+        columns={columns}
+        dataSource={dataSource}
+        loading={loading}
+        rowKey="id"
+        pagination={{
+          total: dataSource.length,
+          pageSize: 10,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (total) => `Total ${total} records`,
+        }}
+      />
 
       {/* Create/Edit Test Step Modal */}
       <Modal
@@ -424,6 +358,35 @@ const TestSteps: React.FC = () => {
             help="Enter parameters separated by commas (e.g., username, password)"
           >
             <Input placeholder="Enter parameters (comma separated)" />
+          </Form.Item>
+
+          <Form.Item
+            label="Function Decorator"
+            name="decorator"
+            help="Python function decorator (e.g., @step, @when, @then, @given)"
+          >
+            <Input placeholder="Enter function decorator (e.g., @step)" />
+          </Form.Item>
+
+          <Form.Item
+            label="Usage Example"
+            name="usage_example"
+            help="Example usage with dynamic variables (e.g., user login with {username} and {password})"
+          >
+            <TextArea
+              rows={2}
+              placeholder="Enter usage example with variables in {brackets}"
+              showCount
+              maxLength={200}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Function Name"
+            name="function_name"
+            help="Python function name for this step"
+          >
+            <Input placeholder="Enter Python function name (e.g., user_login_step)" />
           </Form.Item>
         </Form>
       </Modal>

@@ -5,12 +5,12 @@ from fastapi import APIRouter
 from app.api.api_v1.endpoints import (
     test_steps,
     test_data,
-    test_cases,
-    test_executions,
     projects,
     trade_templates,
     test_case_files
 )
+from app.api.api_v1.endpoints import test_executions_simplified as test_executions
+from app.api.api_v1.endpoints import test_cases_simplified as test_cases
 
 # Create API router
 api_router = APIRouter()

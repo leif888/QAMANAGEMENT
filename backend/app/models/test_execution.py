@@ -54,13 +54,11 @@ class TestExecution(BaseModel):
     # 执行配置
     execution_config = Column(JSON, default=dict, comment="执行配置")
     
-    # 外键关系
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, comment="所属项目ID")
-    test_case_id = Column(Integer, ForeignKey("test_cases.id"), comment="关联测试用例ID")
-    executor_id = Column(Integer, nullable=False, comment="执行者ID")
-    
-    # 关联关系
-    project = relationship("Project", back_populates="test_executions")
+    # Relationships
+    test_case_id = Column(Integer, ForeignKey("test_cases.id"), comment="Associated test case ID")
+    executor_id = Column(Integer, nullable=False, comment="Executor ID")
+
+    # Relationships
     test_case = relationship("TestCase", back_populates="executions")
     step_results = relationship("TestStepResult", back_populates="execution", cascade="all, delete-orphan")
     reports = relationship("TestReport", back_populates="execution", cascade="all, delete-orphan")

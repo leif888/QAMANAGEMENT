@@ -6,13 +6,13 @@ import AppSidebar from './components/layout/AppSidebar'
 import Dashboard from './pages/Dashboard'
 import TestSteps from './pages/TestSteps'
 import TestData from './pages/TestData'
-import TestCases from './pages/TestCasesEnhanced'
+import TestCases from './pages/TestCasesSimple'
 import TestCaseDetail from './pages/TestCaseDetail'
-import TestExecutions from './pages/TestExecutions'
+import TestExecutions from './pages/TestExecutionsSimplified'
 import TestExecutionDetail from './pages/TestExecutionDetail'
 import TestReport from './pages/TestReport'
-import TradeTemplates from './pages/TradeTemplates'
-import Projects from './pages/Projects'
+import TradeTemplates from './pages/TradeTemplatesNew'
+
 
 const { Content } = Layout
 
@@ -25,7 +25,6 @@ function App() {
         <Content style={{ margin: '16px', background: '#fff', padding: '24px' }}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/projects" element={<Projects />} />
             <Route path="/test-steps" element={<TestSteps />} />
             <Route path="/test-data" element={<TestData />} />
             <Route path="/test-cases" element={<TestCases />} />

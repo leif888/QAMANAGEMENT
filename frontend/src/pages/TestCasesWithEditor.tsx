@@ -5,9 +5,9 @@ import {
 } from 'antd'
 import { 
   PlusOutlined, EditOutlined, DeleteOutlined, FolderOutlined, 
-  FileTextOutlined, PlayCircleOutlined, CodeOutlined, FileAddOutlined 
+  FileTextOutlined, FileAddOutlined, CodeOutlined 
 } from '@ant-design/icons'
-import { testCaseApi } from '@/services/api'
+import Editor from '@monaco-editor/react'
 
 const { Title } = Typography
 const { TextArea } = Input
@@ -20,7 +20,6 @@ interface TestCase {
   name: string
   description?: string
   priority?: string
-  status?: string
   gherkin_content?: string
   is_automated?: boolean
   is_folder?: boolean
@@ -41,7 +40,7 @@ interface TestCaseFile {
   file_extension: string
 }
 
-const TestCasesEnhancedPage: React.FC = () => {
+const TestCasesWithEditorPage: React.FC = () => {
   const [treeData, setTreeData] = useState<any[]>([])
   const [selectedTestCase, setSelectedTestCase] = useState<TestCase | null>(null)
   const [selectedFile, setSelectedFile] = useState<TestCaseFile | null>(null)
@@ -53,6 +52,7 @@ const TestCasesEnhancedPage: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [fileContent, setFileContent] = useState('')
   const [activeTab, setActiveTab] = useState('details')
+  const [selectedParentId, setSelectedParentId] = useState<number | null>(null)
 
   useEffect(() => {
     loadTestCases()
@@ -61,8 +61,13 @@ const TestCasesEnhancedPage: React.FC = () => {
   const loadTestCases = async () => {
     try {
       setLoading(true)
-      const response = await testCaseApi.getTestCases()
-      setTreeData(convertToTreeData(response || []))
+      const response = await fetch('http://localhost:8000/api/v1/test-cases/')
+      if (response.ok) {
+        const data = await response.json()
+        setTreeData(convertToTreeData(data))
+      } else {
+        message.error('Failed to load test cases')
+      }
     } catch (error) {
       console.error('Failed to load test cases:', error)
       message.error('Failed to load test cases')
@@ -152,6 +157,7 @@ const TestCasesEnhancedPage: React.FC = () => {
 
       const testCaseData = {
         ...values,
+        parent_id: selectedParentId, // Set parent_id if a folder is selected
       }
 
       const url = isEditMode 
@@ -272,12 +278,23 @@ const TestCasesEnhancedPage: React.FC = () => {
       const testCase = info.node.data
       setSelectedTestCase(testCase)
       setActiveTab('details')
-      
+
+      // Set parent_id for creating new test cases
+      if (testCase.is_folder) {
+        setSelectedParentId(testCase.id)
+      } else {
+        setSelectedParentId(testCase.parent_id)
+      }
+
       // Load files for this test case
       if (!testCase.is_folder) {
         const files = await loadTestCaseFiles(testCase.id)
         setSelectedTestCase({...testCase, files})
       }
+    } else {
+      // Clear selection when clicking empty space
+      setSelectedTestCase(null)
+      setSelectedParentId(null)
     }
   }
 
@@ -310,10 +327,18 @@ const TestCasesEnhancedPage: React.FC = () => {
     }
   }
 
+  const handleContainerClick = (e: React.MouseEvent) => {
+    // Clear selection when clicking on empty space
+    if (e.target === e.currentTarget) {
+      setSelectedTestCase(null)
+      setSelectedParentId(null)
+    }
+  }
+
   return (
-    <div>
+    <div onClick={handleContainerClick}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <Title level={2}>Enhanced Test Case Management</Title>
+        <Title level={2}>Test Case Management</Title>
         <Button
           type="primary"
           icon={<PlusOutlined />}
@@ -336,7 +361,7 @@ const TestCasesEnhancedPage: React.FC = () => {
           </Card>
         </Col>
         <Col span={16}>
-          <Card
+          <Card 
             title={
               <Space>
                 <CodeOutlined />
@@ -361,39 +386,48 @@ const TestCasesEnhancedPage: React.FC = () => {
                     {selectedTestCase.gherkin_content && (
                       <div>
                         <strong>Gherkin Content:</strong>
-                        <TextArea
-                          value={selectedTestCase.gherkin_content}
-                          readOnly
-                          rows={10}
-                          style={{ marginTop: 8, fontFamily: 'monospace' }}
-                        />
+                        <div style={{ marginTop: 8, border: '1px solid #d9d9d9', borderRadius: '6px' }}>
+                          <Editor
+                            height="300px"
+                            language="gherkin"
+                            value={selectedTestCase.gherkin_content}
+                            options={{
+                              readOnly: true,
+                              minimap: { enabled: false },
+                              scrollBeyondLastLine: false,
+                              fontSize: 14,
+                              lineNumbers: 'on',
+                              wordWrap: 'on',
+                            }}
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
                 </TabPane>
-
+                
                 {!selectedTestCase.is_folder && (
                   <TabPane tab="Files" key="files">
                     <div style={{ marginBottom: 16 }}>
-                      <Button
-                        type="primary"
+                      <Button 
+                        type="primary" 
                         icon={<FileAddOutlined />}
                         onClick={() => handleAddFile(selectedTestCase)}
                       >
                         Add File
                       </Button>
                     </div>
-
+                    
                     <Row gutter={16}>
                       <Col span={8}>
                         <div style={{ marginBottom: 16 }}>
                           <strong>Files:</strong>
                         </div>
                         {selectedTestCase.files?.map(file => (
-                          <div
-                            key={file.id}
-                            style={{
-                              padding: '8px',
+                          <div 
+                            key={file.id} 
+                            style={{ 
+                              padding: '8px', 
                               border: selectedFile?.id === file.id ? '2px solid #1890ff' : '1px solid #d9d9d9',
                               borderRadius: '4px',
                               marginBottom: '8px',
@@ -408,7 +442,7 @@ const TestCasesEnhancedPage: React.FC = () => {
                           </div>
                         ))}
                       </Col>
-
+                      
                       <Col span={16}>
                         {selectedFile && (
                           <div>
@@ -418,16 +452,22 @@ const TestCasesEnhancedPage: React.FC = () => {
                                 Save
                               </Button>
                             </div>
-                            <TextArea
-                              value={fileContent}
-                              onChange={(e) => setFileContent(e.target.value)}
-                              rows={20}
-                              style={{ fontFamily: 'monospace' }}
-                              placeholder={selectedFile.file_type === 'feature'
-                                ? 'Feature: Test Feature Name\n  Scenario: Test scenario\n    Given precondition\n    When action\n    Then expected result'
-                                : 'key: value\nconfig:\n  setting: true'
-                              }
-                            />
+                            <div style={{ border: '1px solid #d9d9d9', borderRadius: '6px' }}>
+                              <Editor
+                                height="400px"
+                                language={selectedFile.file_type === 'feature' ? 'gherkin' : 'yaml'}
+                                value={fileContent}
+                                onChange={(value) => setFileContent(value || '')}
+                                options={{
+                                  minimap: { enabled: false },
+                                  scrollBeyondLastLine: false,
+                                  fontSize: 14,
+                                  lineNumbers: 'on',
+                                  wordWrap: 'on',
+                                  automaticLayout: true,
+                                }}
+                              />
+                            </div>
                           </div>
                         )}
                       </Col>
@@ -468,6 +508,14 @@ const TestCasesEnhancedPage: React.FC = () => {
             is_folder: false,
           }}
         >
+          {selectedParentId && (
+            <div style={{ marginBottom: 16, padding: 12, background: '#f0f8ff', borderRadius: 6 }}>
+              <strong>Parent Folder:</strong> {selectedTestCase?.name || 'Selected Folder'}
+              <br />
+              <small>This test case will be created under the selected folder.</small>
+            </div>
+          )}
+
           <Form.Item
             label="Test Case Name"
             name="name"
@@ -498,14 +546,21 @@ const TestCasesEnhancedPage: React.FC = () => {
             label="Gherkin Content (BDD)"
             name="gherkin_content"
           >
-            <TextArea 
-              rows={6} 
-              placeholder="Feature: Test Case Name
-  Scenario: Test scenario
-    Given precondition
-    When action
-    Then expected result"
-            />
+            <div style={{ border: '1px solid #d9d9d9', borderRadius: '6px' }}>
+              <Editor
+                height="200px"
+                language="gherkin"
+                defaultValue=""
+                options={{
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  fontSize: 14,
+                  lineNumbers: 'on',
+                  wordWrap: 'on',
+                }}
+                onChange={(value) => form.setFieldsValue({ gherkin_content: value })}
+              />
+            </div>
           </Form.Item>
 
           <div style={{ display: 'flex', gap: 16 }}>
@@ -571,11 +626,21 @@ const TestCasesEnhancedPage: React.FC = () => {
             label="Initial Content"
             name="content"
           >
-            <TextArea 
-              rows={8} 
-              placeholder="Enter initial file content..."
-              style={{ fontFamily: 'monospace' }}
-            />
+            <div style={{ border: '1px solid #d9d9d9', borderRadius: '6px' }}>
+              <Editor
+                height="200px"
+                language="gherkin"
+                defaultValue=""
+                options={{
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  fontSize: 14,
+                  lineNumbers: 'on',
+                  wordWrap: 'on',
+                }}
+                onChange={(value) => fileForm.setFieldsValue({ content: value })}
+              />
+            </div>
           </Form.Item>
         </Form>
       </Modal>
@@ -583,4 +648,4 @@ const TestCasesEnhancedPage: React.FC = () => {
   )
 }
 
-export default TestCasesEnhancedPage
+export default TestCasesWithEditorPage

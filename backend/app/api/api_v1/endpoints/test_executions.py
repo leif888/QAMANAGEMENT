@@ -15,21 +15,24 @@ router = APIRouter()
 
 class TestExecutionCreate(BaseModel):
     name: str
-    test_case_ids: List[int]  # 支持多选测试用例
-    project_id: int
+    description: str = ""
+    test_case_ids: List[int] = []  # Support multi-select test cases
     environment: str = "test"
     browser: str = "chromium"
     headless: bool = True
     executor: str = "system"
+    status: str = "pending"
+    notes: str = ""
 
 class TestExecutionResponse(BaseModel):
     id: int
     name: str
+    description: str = ""
     test_case_ids: List[int] = []
     test_case_names: List[str] = []
-    project_id: int
     status: str
     progress: int = 0
+    pass_rate: int = 0
     environment: str
     browser: str
     headless: bool
@@ -50,17 +53,13 @@ class TestExecutionResponse(BaseModel):
     class Config:
         from_attributes = True
 
-@router.get("/", response_model=List[TestExecutionResponse])
+@router.get("/")
 async def get_test_executions(
-    project_id: Optional[int] = None,
     status: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """获取测试执行记录列表"""
+    """Get test execution records list"""
     query = db.query(TestExecution)
-
-    if project_id:
-        query = query.filter(TestExecution.project_id == project_id)
 
     if status:
         query = query.filter(TestExecution.status == status)

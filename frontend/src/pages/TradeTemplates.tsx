@@ -7,8 +7,7 @@ import {
   PlusOutlined, EditOutlined, DeleteOutlined, FolderOutlined, 
   FileTextOutlined, PlayCircleOutlined, CodeOutlined 
 } from '@ant-design/icons'
-import { projectApi } from '@/services/api'
-import type { Project } from '@/types'
+
 
 const { Title } = Typography
 const { TextArea } = Input
@@ -16,14 +15,14 @@ const { Option } = Select
 const { DirectoryTree } = Tree
 
 interface TradeTemplate {
-  id: string
+  id: number
   name: string
   description?: string
   node_type: 'folder' | 'template'
-  parent_id?: string
+  parent_id?: number
   jinja2_content?: string
   template_variables: Record<string, any>
-  project_id: number
+
   full_path?: string
   children?: TradeTemplate[]
 }
@@ -36,6 +35,7 @@ const TradeTemplatesPage: React.FC = () => {
   const [form] = Form.useForm()
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<number | null>(null)
+  const [selectedParentId, setSelectedParentId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [templateContent, setTemplateContent] = useState('')
   const [isRenderModalVisible, setIsRenderModalVisible] = useState(false)
@@ -44,13 +44,8 @@ const TradeTemplatesPage: React.FC = () => {
 
   useEffect(() => {
     loadProjects()
+    loadTradeTemplates()
   }, [])
-
-  useEffect(() => {
-    if (selectedProject) {
-      loadTradeTemplates()
-    }
-  }, [selectedProject])
 
   const loadProjects = async () => {
     try {
@@ -64,10 +59,10 @@ const TradeTemplatesPage: React.FC = () => {
 
   const loadTradeTemplates = async () => {
     if (!selectedProject) return
-    
+
     try {
       setLoading(true)
-      const response = await fetch(`http://localhost:8000/api/v1/trade-templates/tree?project_id=${selectedProject}`)
+      const response = await fetch('http://localhost:8000/api/v1/trade-templates/')
       if (response.ok) {
         const data = await response.json()
         setTreeData(convertToTreeData(data))
@@ -136,19 +131,21 @@ const TradeTemplatesPage: React.FC = () => {
   }
 
   const handleCreateTemplate = async () => {
-    if (!selectedProject) {
-      message.error('Please select a project first')
-      return
-    }
-
     try {
       const values = await form.validateFields()
+      console.log('Creating template with values:', values)
       setLoading(true)
 
       const templateData = {
-        ...values,
-        project_id: selectedProject,
+        name: values.name,
+        description: values.description || '',
+        node_type: values.node_type,
+        parent_id: selectedParentId,
+        jinja2_content: values.jinja2_content || '',
+        template_variables: values.template_variables || {},
+        creator_id: 1
       }
+      console.log('Sending template data:', templateData)
 
       const url = isEditMode 
         ? `http://localhost:8000/api/v1/trade-templates/${selectedTemplate?.id}`
@@ -421,16 +418,7 @@ const TradeTemplatesPage: React.FC = () => {
             />
           </Form.Item>
 
-          <Form.Item
-            label="Template Variables (JSON)"
-            name="template_variables"
-          >
-            <TextArea 
-              rows={4} 
-              placeholder='{"name": {"type": "string", "default": "World"}}'
-              style={{ fontFamily: 'monospace' }}
-            />
-          </Form.Item>
+
         </Form>
       </Modal>
 

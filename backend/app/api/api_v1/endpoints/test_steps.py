@@ -14,12 +14,11 @@ class TestStepCreate(BaseModel):
     name: str
     description: str = None
     type: str  # "action", "verification", "setup"
-    parameters: List[dict] = []
+    parameters: List[dict] = None
     decorator: str = None  # "@given", "@when", "@then"
     usage_example: str = None
     function_name: str = None
-    project_id: int
-    creator_id: int = 1  # 默认创建者
+    creator_id: int = 1  # Default creator
 
 class TestStepUpdate(BaseModel):
     name: str = None
@@ -36,11 +35,11 @@ class TestStepResponse(BaseModel):
     description: str = None
     type: str
     parameters: List[dict] = []
-    usage_count: int = 0
+
     decorator: str = None
     usage_example: str = None
     function_name: str = None
-    project_id: int
+
     creator_id: int = None
     created_at: str = None
     updated_at: str = None
@@ -48,17 +47,13 @@ class TestStepResponse(BaseModel):
     class Config:
         from_attributes = True
 
-@router.get("/", response_model=List[TestStepResponse])
+@router.get("/")
 async def get_test_steps(
-    project_id: Optional[int] = Query(None, description="项目ID过滤"),
-    step_type: Optional[str] = Query(None, description="步骤类型过滤"),
+    step_type: Optional[str] = Query(None, description="Step type filter"),
     db: Session = Depends(get_db)
 ):
-    """获取测试步骤列表"""
+    """Get test steps list"""
     query = db.query(TestStep)
-
-    if project_id:
-        query = query.filter(TestStep.project_id == project_id)
 
     if step_type:
         try:
@@ -67,7 +62,7 @@ async def get_test_steps(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid step type")
 
-    steps = query.order_by(TestStep.usage_count.desc()).all()
+    steps = query.order_by(TestStep.created_at.desc()).all()
     # Convert enum to string for response
     result = []
     for step in steps:
@@ -83,11 +78,11 @@ async def get_test_steps(
             "description": step.description or "",
             "type": step.type.value if step.type else "unknown",
             "parameters": parameters,
-            "usage_count": step.usage_count or 0,
+
             "decorator": step.decorator or "",
             "usage_example": step.usage_example or "",
             "function_name": step.function_name or "",
-            "project_id": step.project_id,
+
             "creator_id": step.creator_id or 1,
             "created_at": step.created_at.isoformat() if step.created_at else None,
             "updated_at": step.updated_at.isoformat() if step.updated_at else None,
@@ -104,24 +99,23 @@ async def create_test_step(step: TestStepCreate, db: Session = Depends(get_db)):
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid step type")
 
-    # 检查同项目下是否有重名步骤
+    # Check for duplicate step names
     existing_step = db.query(TestStep).filter(
-        TestStep.name == step.name,
-        TestStep.project_id == step.project_id
+        TestStep.name == step.name
     ).first()
     if existing_step:
-        raise HTTPException(status_code=400, detail="Step name already exists in this project")
+        raise HTTPException(status_code=400, detail="Step name already exists")
 
     # 创建新步骤
     db_step = TestStep(
         name=step.name,
         description=step.description,
         type=step_type_enum,
-        parameters=step.parameters,
+        parameters=step.parameters or [],
         decorator=step.decorator,
         usage_example=step.usage_example,
         function_name=step.function_name,
-        project_id=step.project_id,
+
         creator_id=step.creator_id
     )
     db.add(db_step)
@@ -135,11 +129,11 @@ async def create_test_step(step: TestStepCreate, db: Session = Depends(get_db)):
         "description": db_step.description or "",
         "type": db_step.type.value,
         "parameters": db_step.parameters or [],
-        "usage_count": db_step.usage_count or 0,
+
         "decorator": db_step.decorator or "",
         "usage_example": db_step.usage_example or "",
         "function_name": db_step.function_name or "",
-        "project_id": db_step.project_id,
+
         "creator_id": db_step.creator_id or 1,
         "created_at": db_step.created_at.isoformat() if db_step.created_at else None,
         "updated_at": db_step.updated_at.isoformat() if db_step.updated_at else None,
@@ -165,7 +159,6 @@ async def update_test_step(step_id: int, step: TestStepUpdate, db: Session = Dep
         # 检查名称冲突
         existing = db.query(TestStep).filter(
             TestStep.name == step.name,
-            TestStep.project_id == db_step.project_id,
             TestStep.id != step_id
         ).first()
         if existing:
@@ -195,7 +188,20 @@ async def update_test_step(step_id: int, step: TestStepUpdate, db: Session = Dep
 
     db.commit()
     db.refresh(db_step)
-    return db_step
+
+    return {
+        "id": db_step.id,
+        "name": db_step.name,
+        "description": db_step.description or "",
+        "type": db_step.type.value if hasattr(db_step.type, 'value') else str(db_step.type),
+        "parameters": db_step.parameters or [],
+        "decorator": db_step.decorator or "",
+        "usage_example": db_step.usage_example or "",
+        "function_name": db_step.function_name or "",
+        "creator_id": db_step.creator_id,
+        "created_at": db_step.created_at.isoformat() if db_step.created_at else None,
+        "updated_at": db_step.updated_at.isoformat() if db_step.updated_at else None,
+    }
 
 @router.delete("/{step_id}")
 async def delete_test_step(step_id: int, db: Session = Depends(get_db)):

@@ -8,7 +8,7 @@ import enum
 
 
 class Priority(enum.Enum):
-    """优先级枚举"""
+    """Priority enumeration"""
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
@@ -26,14 +26,8 @@ class TestCase(BaseModel):
     """测试用例模型"""
     __tablename__ = "test_cases"
 
-    name = Column(String(255), nullable=False, index=True, comment="用例名称")
-    description = Column(Text, comment="用例描述")
-    priority = Column(
-        Enum(Priority),
-        default=Priority.MEDIUM,
-        nullable=False,
-        comment="优先级"
-    )
+    name = Column(String(255), nullable=False, index=True, comment="Test case name")
+    tags = Column(String(500), comment="Tags for test case (comma separated)")
     status = Column(
         Enum(TestCaseStatus),
         default=TestCaseStatus.DRAFT,
@@ -44,20 +38,17 @@ class TestCase(BaseModel):
     # BDD内容
     gherkin_content = Column(Text, comment="Gherkin语法内容")
 
-    # 是否自动化
-    is_automated = Column(Boolean, default=False, comment="是否自动化")
+
 
     # 树形结构字段
     parent_id = Column(Integer, ForeignKey("test_cases.id"), comment="父用例ID（用于组织层级结构）")
     sort_order = Column(Integer, default=0, comment="排序顺序")
     is_folder = Column(Boolean, default=False, comment="是否为文件夹节点")
 
-    # 外键关系
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, comment="所属项目ID")
-    creator_id = Column(Integer, nullable=False, comment="创建者ID")  # 暂时用整数，后续可关联用户表
+    # Metadata
+    creator_id = Column(Integer, nullable=False, comment="Creator ID")
 
     # Relationships
-    project = relationship("Project", back_populates="test_cases")
     test_case_steps = relationship("TestCaseStep", back_populates="test_case", cascade="all, delete-orphan")
     executions = relationship("TestExecution", back_populates="test_case")
     reviews = relationship("TestCaseReview", back_populates="test_case", cascade="all, delete-orphan")

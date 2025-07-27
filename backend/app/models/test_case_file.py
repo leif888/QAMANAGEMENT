@@ -27,16 +27,14 @@ class TestCaseFile(BaseModel):
     
     # Relationships
     test_case_id = Column(Integer, ForeignKey("test_cases.id"), nullable=False, comment="Test case ID")
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, comment="Project ID")
     creator_id = Column(Integer, default=1, comment="Creator ID")
-    
+
     # Metadata
     is_active = Column(Boolean, default=True, comment="Is active")
     version = Column(String(50), default="v1.0", comment="Version")
-    
+
     # Relationships
     test_case = relationship("TestCase", back_populates="files")
-    project = relationship("Project", back_populates="test_case_files")
 
     def __repr__(self):
         return f"<TestCaseFile(id={self.id}, name='{self.name}', type='{self.file_type.value}')>"

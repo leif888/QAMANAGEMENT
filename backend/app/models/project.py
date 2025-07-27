@@ -27,14 +27,7 @@ class Project(BaseModel):
         comment="项目状态"
     )
 
-    # Relationships
-    test_steps = relationship("TestStep", back_populates="project", cascade="all, delete-orphan")
-    test_data = relationship("TestData", back_populates="project", cascade="all, delete-orphan")
-    test_data_nodes = relationship("TestDataNode", back_populates="project", cascade="all, delete-orphan")
-    test_cases = relationship("TestCase", back_populates="project", cascade="all, delete-orphan")
-    test_executions = relationship("TestExecution", back_populates="project", cascade="all, delete-orphan")
-    trade_templates = relationship("TradeTemplate", back_populates="project", cascade="all, delete-orphan")
-    test_case_files = relationship("TestCaseFile", back_populates="project", cascade="all, delete-orphan")
+    # Note: Relationships removed as we simplified the system to not use projects
 
     def __repr__(self):
         return f"<Project(id={self.id}, name='{self.name}', status='{self.status.value}')>"

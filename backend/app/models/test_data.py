@@ -35,12 +35,8 @@ class TestDataNode(BaseModel):
     is_active = Column(Boolean, default=True, comment="是否激活")
     version = Column(String(50), default="v1.0", comment="版本号")
 
-    # 外键关系
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, comment="所属项目ID")
-    creator_id = Column(Integer, comment="创建者ID")
-
-    # 关联关系
-    project = relationship("Project", back_populates="test_data_nodes")
+    # Metadata
+    creator_id = Column(Integer, comment="Creator ID")
     # creator = relationship("User", foreign_keys=[creator_id])  # 暂时注释，等用户模型创建后启用
     parent = relationship("TestDataNode", remote_side="TestDataNode.id", back_populates="children")
     children = relationship("TestDataNode", back_populates="parent", cascade="all, delete-orphan")
@@ -81,11 +77,8 @@ class TestData(BaseModel):
     # 数据结构定义
     schema_definition = Column(JSON, default=dict, comment="数据结构定义")
 
-    # 外键关系
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, comment="所属项目ID")
-
-    # 关联关系
-    project = relationship("Project", back_populates="test_data")
+    # Metadata
+    creator_id = Column(Integer, comment="Creator ID")
 
     def __repr__(self):
         return f"<TestData(id={self.id}, name='{self.name}', version='{self.version}')>"

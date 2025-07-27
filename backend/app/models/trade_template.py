@@ -34,13 +34,10 @@ class TradeTemplate(BaseModel):
     template_variables = Column(JSON, default=dict, comment="Template variables definition")
 
     # Metadata
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, comment="Project ID")
     creator_id = Column(Integer, default=1, comment="Creator ID")
     is_active = Column(Boolean, default=True, comment="Is active")
     version = Column(String(50), default="v1.0", comment="Version")
-
-    # Relationships
-    project = relationship("Project", back_populates="trade_templates")
+    # Tree structure relationships
     parent = relationship("TradeTemplate", remote_side="TradeTemplate.id", back_populates="children")
     children = relationship("TradeTemplate", back_populates="parent", cascade="all, delete-orphan")
 

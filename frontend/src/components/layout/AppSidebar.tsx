@@ -24,11 +24,6 @@ const AppSidebar: React.FC = () => {
       label: 'Dashboard',
     },
     {
-      key: '/projects',
-      icon: <ProjectOutlined />,
-      label: 'Projects',
-    },
-    {
       key: '/test-steps',
       icon: <OrderedListOutlined />,
       label: 'Test Steps',
@@ -44,14 +39,14 @@ const AppSidebar: React.FC = () => {
       label: 'Test Cases',
     },
     {
-      key: '/test-executions',
-      icon: <PlayCircleOutlined />,
-      label: 'Test Executions',
-    },
-    {
       key: '/trade-templates',
       icon: <FileTextOutlined />,
       label: 'Trade Templates',
+    },
+    {
+      key: '/test-executions',
+      icon: <PlayCircleOutlined />,
+      label: 'Test Executions',
     },
   ]
 
